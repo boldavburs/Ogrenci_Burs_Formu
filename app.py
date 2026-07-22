@@ -228,7 +228,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         # doğrudan çocuğu olduğunda böyle bir kırpma olmuyor.
         if logo_b64:
             st.markdown(
-                f'<div style="position:absolute; top:150; bottom:0; left:50%; '
+                f'<div style="position:absolute; top:100; bottom:0; left:50%; '
                 f'transform:translateX(-50%); display:flex; align-items:center; z-index:2;">'
                 f'<img src="data:image/png;base64,{logo_b64}" '
                 f'style="height:92px; width:92px; border-radius:50%; '
