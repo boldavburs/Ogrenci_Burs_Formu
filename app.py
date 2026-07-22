@@ -197,7 +197,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         """
         <style>
         .st-key-ust_serit_kutu { background:#F5821F; border-radius:12px;
-            padding:1.25rem 2rem; margin-bottom:1.5rem; }
+            padding:1.25rem 2rem; margin-bottom:1.5rem; position:relative; }
         .st-key-ust_serit_kutu button { background:#FFFFFF !important; }
         </style>
         """,
@@ -221,15 +221,13 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         with col_logo:
             if logo_b64:
                 st.markdown(
-                    f'<div style="display:flex; justify-content:center; align-items:stretch; '
-                    f'width:100%; margin:-1.25rem 0;">'
+                    f'<div style="position:absolute; top:0; bottom:0; left:50%; '
+                    f'transform:translateX(-50%); display:flex; align-items:center;">'
                     f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:auto; aspect-ratio:1/1; align-self:stretch; '
-                    f'border-radius:50%; background:#FFFFFF; padding:5px; object-fit:cover; '
-                    f'display:block;" /></div>',
+                    f'style="height:100%; aspect-ratio:1/1; border-radius:50%; '
+                    f'background:#FFFFFF; padding:5px; object-fit:cover; display:block;" /></div>',
                     unsafe_allow_html=True,
                 )
-       
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
