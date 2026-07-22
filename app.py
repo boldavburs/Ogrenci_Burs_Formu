@@ -49,10 +49,10 @@ def _call_apps_script(payload: dict) -> dict:
     return resp.json()
 
 
-def _update_review_status(tc_no: str, value: str) -> bool:
+def _update_review_status(tc_no, value: str) -> bool:
     payload = {
         "action": "update_review",
-        "tc_no": tc_no,
+        "tc_no": str(tc_no),
         "value": value,
         "secret": st.secrets["APPS_SCRIPT_SECRET"],
     }
@@ -106,11 +106,11 @@ def _sync_donemler(donemler: list) -> dict:
     return resp.json()
 
 
-def _delete_row(tc_no: str, donem: str) -> bool:
+def _delete_row(tc_no, donem) -> bool:
     payload = {
         "action": "delete_row",
-        "tc_no": tc_no,
-        "donem": donem,
+        "tc_no": str(tc_no),
+        "donem": str(donem),
         "secret": st.secrets["APPS_SCRIPT_SECRET"],
     }
     resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
@@ -246,6 +246,36 @@ def _bolum_basligi(numara: str, baslik: str):
         """,
         unsafe_allow_html=True,
     )
+
+
+@st.dialog("Silme İşlemini Onaylayın")
+def _silme_onay_dialogu():
+    n = len(st.session_state.get("silinecek_kayitlar", set()))
+    st.write(f"**{n} adet kayıt silinecektir.**")
+    st.write(
+        "Bu işlem sonrasında başvuru satırı tablodan kalıcı olarak silinir "
+        "(Drive'daki evrak klasörü çöp kutusuna taşınır, 30 gün içinde geri alınabilir)."
+    )
+    st.write("**Emin misiniz?**")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Evet, Sil", type="primary", use_container_width=True):
+            basarili = 0
+            for tc_no, donem_deger in list(st.session_state.silinecek_kayitlar):
+                try:
+                    if _delete_row(tc_no, donem_deger):
+                        basarili += 1
+                except Exception as e:
+                    st.error(f"{tc_no} silinemedi: {e}")
+            st.session_state.silinecek_kayitlar = set()
+            st.session_state["silme_onay_bekliyor"] = False
+            st.cache_data.clear()
+            st.session_state["silme_basarili_sayisi"] = basarili
+            st.rerun()
+    with col2:
+        if st.button("Vazgeç", use_container_width=True):
+            st.session_state["silme_onay_bekliyor"] = False
+            st.rerun()
 
 
 @st.dialog("Başvuruyu Onaylayın")
@@ -836,18 +866,13 @@ else:
                     fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
                     st.plotly_chart(fig, use_container_width=True)
 
-            # -------------------- BAŞVURU LİSTESİ (İncelendi işaretleme + Silme) --------------------
+            # -------------------- BAŞVURU LİSTESİ (İncelendi işaretleme) --------------------
             with tab_liste:
-                st.caption(
-                    "İncelendi kutucuğunu işaretleyip veya silmek istediğiniz satırlarda **Sil** "
-                    "kutucuğunu işaretleyip **Değişiklikleri Kaydet**'e basın. **Silme işlemi geri alınamaz** "
-                    "(başvuru satırı ve Drive'daki evrak klasörü çöp kutusuna taşınır)."
-                )
+                st.caption("İncelendi kutucuğunu işaretleyip **Değişiklikleri Kaydet**'e basın.")
                 display_cols = [c for c in df.columns if not c.startswith("Belge:")]
                 edit_df = df[display_cols].copy()
                 if "İncelendi" in edit_df.columns:
                     edit_df["İncelendi"] = edit_df["İncelendi"].apply(lambda v: str(v).strip() == "Evet")
-                edit_df["Sil"] = False
 
                 edited = st.data_editor(
                     edit_df,
@@ -856,41 +881,24 @@ else:
                     disabled=[c for c in display_cols if c != "İncelendi"],
                     column_config={
                         "İncelendi": st.column_config.CheckboxColumn("İncelendi", default=False),
-                        "Sil": st.column_config.CheckboxColumn("Sil", default=False),
                     },
                     key="editor",
                 )
 
                 if st.button("💾 Değişiklikleri Kaydet", type="primary"):
                     degisen = 0
-                    silinen = 0
                     for i in range(len(edit_df)):
-                        tc_no = edit_df.iloc[i].get("T.C. Kimlik No", "")
-                        donem_deger = edit_df.iloc[i].get("Dönem", "")
-                        if edited.iloc[i]["Sil"]:
-                            try:
-                                if _delete_row(tc_no, donem_deger):
-                                    silinen += 1
-                                else:
-                                    st.error(f"{tc_no} silinemedi (bulunamadı).")
-                            except Exception as e:
-                                st.error(f"{tc_no} silinemedi: {e}")
-                            continue
                         eski = edit_df.iloc[i]["İncelendi"]
                         yeni = edited.iloc[i]["İncelendi"]
                         if eski != yeni:
+                            tc_no = edit_df.iloc[i].get("T.C. Kimlik No", "")
                             try:
                                 _update_review_status(tc_no, "Evet" if yeni else "Hayır")
                                 degisen += 1
                             except Exception as e:
                                 st.error(f"{tc_no} güncellenemedi: {e}")
-                    if silinen or degisen:
-                        mesaj = []
-                        if silinen:
-                            mesaj.append(f"{silinen} kayıt silindi")
-                        if degisen:
-                            mesaj.append(f"{degisen} kayıt güncellendi")
-                        st.success(", ".join(mesaj) + ".")
+                    if degisen:
+                        st.success(f"{degisen} kayıt güncellendi.")
                         st.cache_data.clear()
                         st.rerun()
                     else:
@@ -906,6 +914,58 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )
+
+                # -------------------- KAYIT SİLME (kırmızı buton + onay) --------------------
+                st.divider()
+                st.markdown("#### 🗑️ Kayıt Silme")
+                st.caption(
+                    "Silmek istediğiniz kaydın yanındaki kırmızı butona basın — kayıt listeden kaldırılır "
+                    "(henüz silinmez). Ardından **Silme İşlemini Uygula**'ya basıp onaylayınca kalıcı olarak silinir."
+                )
+
+                if "silinecek_kayitlar" not in st.session_state:
+                    st.session_state.silinecek_kayitlar = set()
+                if "silme_basarili_sayisi" in st.session_state:
+                    n = st.session_state.pop("silme_basarili_sayisi")
+                    if n:
+                        st.success(f"{n} kayıt silindi.")
+
+                gorunur_satirlar = [
+                    (
+                        str(r.get("T.C. Kimlik No", "")),
+                        str(r.get("Dönem", "")),
+                        str(r.get("Öğrenci Adı Soyadı", "—")),
+                        str(r.get("Bölüm", "—")),
+                    )
+                    for _, r in df.iterrows()
+                    if (str(r.get("T.C. Kimlik No", "")), str(r.get("Dönem", ""))) not in st.session_state.silinecek_kayitlar
+                ]
+
+                if not gorunur_satirlar:
+                    st.info("Gösterilecek kayıt yok.")
+                else:
+                    for tc_no, donem_deger, ad, bolum in gorunur_satirlar:
+                        c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                        c1.write(ad)
+                        c2.write(bolum)
+                        c3.write(donem_deger)
+                        if c4.button("🗑️", key=f"kaldir_{tc_no}_{donem_deger}", help="Listeden kaldır"):
+                            st.session_state.silinecek_kayitlar.add((tc_no, donem_deger))
+                            st.rerun()
+
+                if st.session_state.silinecek_kayitlar:
+                    st.warning(f"{len(st.session_state.silinecek_kayitlar)} kayıt silinmek üzere işaretlendi.")
+                    col_uygula, col_vazgec = st.columns(2)
+                    with col_uygula:
+                        if st.button("🗑️ Silme İşlemini Uygula", type="primary", use_container_width=True):
+                            st.session_state["silme_onay_bekliyor"] = True
+                    with col_vazgec:
+                        if st.button("İşaretleri Temizle", use_container_width=True):
+                            st.session_state.silinecek_kayitlar = set()
+                            st.rerun()
+
+                if st.session_state.get("silme_onay_bekliyor"):
+                    _silme_onay_dialogu()
 
             # -------------------- EVRAK KLASÖRLERİ --------------------
             with tab_evrak:
