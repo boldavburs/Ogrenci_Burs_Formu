@@ -219,6 +219,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                 unsafe_allow_html=True,
             )
         with col_logo:
+    
     if logo_b64:
         st.markdown(
             f'<div style="display:flex; justify-content:center; align-items:stretch; '
@@ -229,6 +230,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
             f'display:block;" /></div>',
             unsafe_allow_html=True,
         )
+       
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
