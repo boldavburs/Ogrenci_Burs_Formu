@@ -1,0 +1,503 @@
+import json
+import base64
+from datetime import date, datetime
+from io import BytesIO
+
+import requests
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+# ============================================================================
+# AYARLAR
+# ============================================================================
+# NOT (varsayım): Yüklenecek 3 sabit belge aşağıdaki gibi kabul edilmiştir.
+# Farklıysa SADECE bu listeyi değiştirmeniz yeterlidir, başka yer değişmez.
+REQUIRED_DOCUMENTS = [
+    {"key": "ogrenci_belgesi", "label": "Öğrenci Belgesi"},
+    {"key": "kimlik_fotokopisi", "label": "Nüfus Cüzdanı / Kimlik Fotokopisi"},
+    {"key": "gelir_belgesi", "label": "Aile Gelir Durumunu Gösterir Belge"},
+]
+
+MESLEK_SECENEKLERI = [
+    "Memur", "İşçi (Özel Sektör)", "Esnaf / Küçük İşletme Sahibi", "Çiftçi / Hayvancılık",
+    "Serbest Meslek (Avukat, Doktor, Mühendis vb.)", "Şoför", "Emekli",
+    "Ev Hanımı", "İşsiz / Çalışmıyor", "Vefat Etti", "Diğer",
+]
+
+try:
+    st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
+except Exception:
+    st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="📋", layout="wide")
+
+with open("data/il_ilce.json", "r", encoding="utf-8") as f:
+    IL_ILCE = json.load(f)
+IL_LISTESI = list(IL_ILCE.keys())
+
+with open("data/universiteler.json", "r", encoding="utf-8") as f:
+    UNIVERSITE_LISTESI = json.load(f)
+UNIVERSITE_LISTESI_ARAMA = UNIVERSITE_LISTESI + ["Listede Yok / Diğer"]
+
+
+def _call_apps_script(payload: dict) -> dict:
+    """Google Apps Script Web App'e POST isteği gönderir."""
+    url = st.secrets["APPS_SCRIPT_URL"]
+    payload["secret"] = st.secrets["APPS_SCRIPT_SECRET"]
+    resp = requests.post(url, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _update_review_status(tc_no: str, value: str) -> bool:
+    payload = {
+        "action": "update_review",
+        "tc_no": tc_no,
+        "value": value,
+        "secret": st.secrets["APPS_SCRIPT_SECRET"],
+    }
+    resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("ok", False)
+
+
+def _fetch_all_rows() -> dict:
+    url = st.secrets["APPS_SCRIPT_URL"]
+    resp = requests.get(
+        url,
+        params={"action": "list_rows", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _file_to_b64(uploaded_file) -> dict:
+    data = uploaded_file.getvalue()
+    return {
+        "filename": uploaded_file.name,
+        "mimetype": uploaded_file.type or "application/octet-stream",
+        "data_b64": base64.b64encode(data).decode("utf-8"),
+    }
+
+
+def _il_ilce_secimi(il_label: str, ilce_label: str, prefix: str):
+    """İl seçilince ilçe listesini otomatik filtreler (canlı güncelleme için form dışında kullanılmalı)."""
+    il = st.selectbox(il_label, IL_LISTESI, index=None, placeholder="İl seçiniz", key=f"{prefix}_il")
+    ilceler = IL_ILCE.get(il, []) if il else []
+    ilce = st.selectbox(
+        ilce_label, ilceler, index=None,
+        placeholder="Önce il seçiniz" if not il else "İlçe seçiniz",
+        disabled=not il, key=f"{prefix}_ilce",
+    )
+    return il, ilce
+
+
+def _meslek_secimi(label: str, prefix: str):
+    meslek = st.selectbox(label, MESLEK_SECENEKLERI, index=None, placeholder="Seçiniz", key=f"{prefix}_meslek")
+    meslek_diger = ""
+    if meslek == "Diğer":
+        meslek_diger = st.text_input("Mesleği yazın", key=f"{prefix}_meslek_diger")
+    return meslek_diger.strip() if meslek == "Diğer" else meslek
+
+
+# ============================================================================
+# NAVİGASYON
+# ============================================================================
+if "view" not in st.session_state:
+    st.session_state.view = "form"
+if "admin_authed" not in st.session_state:
+    st.session_state.admin_authed = False
+
+col_a, col_b, col_c = st.columns([5, 1, 1])
+with col_b:
+    if st.session_state.view == "form":
+        if st.button("Yönetici Girişi", use_container_width=True):
+            st.session_state.view = "admin"
+            st.rerun()
+    else:
+        if st.button("Forma Dön", use_container_width=True):
+            st.session_state.view = "form"
+            st.rerun()
+with col_c:
+    try:
+        st.image("logo.png", width=70)
+    except Exception:
+        pass
+
+# ============================================================================
+# ÖĞRENCİ BAŞVURU FORMU
+# ============================================================================
+# NOT: Bu bölüm bilinçli olarak st.form KULLANMAZ. İl -> İlçe seçimlerinin
+# anında (her il değiştiğinde) filtrelenebilmesi için widget'ların her
+# etkileşimde yeniden çalışması (rerun) gerekir; st.form içindeki widget'lar
+# sadece "gönder" butonuna basılınca güncellenir ve ilçe listesi o ana kadar
+# bayat kalırdı. Bu yüzden gönderim ayrı bir st.button ile tetiklenir.
+if st.session_state.view == "form":
+    st.markdown("## Öğrenci Bilgi ve Başvuru Formu")
+    st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin.")
+
+    st.markdown("### 1. Öğrenci Bilgileri")
+    c1, c2 = st.columns(2)
+    with c1:
+        ad_soyad = st.text_input("Öğrenci Adı Soyadı *")
+        tc_no = st.text_input("T.C. Kimlik No *", max_chars=11)
+    with c2:
+        cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
+        email = st.text_input("E-Posta Adresi *")
+    telefon = st.text_input("Cep Telefon Numarası *", placeholder="05xx xxx xx xx")
+    dogum_tarihi = st.date_input(
+        "Öğrenci Doğum Tarihi *", value=date(2004, 1, 1),
+        min_value=date(1980, 1, 1), max_value=date.today(),
+    )
+
+    st.markdown("**Öğrenci Doğum Yeri**")
+    d1, d2 = st.columns(2)
+    with d1:
+        dogum_il, dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "ogrenci_dogum")
+    st.markdown("**Nüfusa Kayıtlı Olduğu Yer**")
+    n1, n2 = st.columns(2)
+    with n1:
+        nufus_il, nufus_ilce = _il_ilce_secimi("İl *", "İlçe *", "nufus_kayit")
+
+    st.markdown("### 2. İkamet Bilgisi")
+    c3, c4 = st.columns(2)
+    with c3:
+        ikamet_il, ikamet_ilce = _il_ilce_secimi("İkamet Edilen İl *", "İkamet Edilen İlçe *", "ikamet")
+    with c4:
+        kaldigi_yer = st.selectbox(
+            "Öğrencinin Kaldığı Yer *",
+            ["Aile Yanında", "Yurtta", "Kirada / Arkadaşlarıyla", "Akraba Yanında", "Diğer"],
+        )
+
+    st.markdown("### 3. Eğitim Bilgileri")
+    c5, c6 = st.columns(2)
+    with c5:
+        universite = st.selectbox(
+            "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
+            placeholder="Üniversite adı yazarak arayın...",
+        )
+        universite_diger = ""
+        if universite == "Listede Yok / Diğer":
+            universite_diger = st.text_input("Üniversite adını yazın *")
+        bolum = st.text_input("Bölüm *")
+        okul_ili = st.selectbox("Okulun Bulunduğu İl *", IL_LISTESI, index=None, placeholder="İl seçiniz")
+    with c6:
+        fakulte = st.text_input("Fakülte *")
+        sinif = st.selectbox("Sınıfı *", ["Hazırlık", "1", "2", "3", "4", "5", "6", "Yüksek Lisans"])
+        lise_derece = st.text_input("Lise Mezuniyet Derecesi / Ortalaması *")
+    lise_adi = st.text_input("Mezun Olduğu Lise ve Dengi Okul *")
+
+    st.markdown("### 4. Aile Bilgileri")
+    st.markdown("**Baba**")
+    c7, c8 = st.columns(2)
+    with c7:
+        baba_adi = st.text_input("Baba Adı *")
+        baba_telefon = st.text_input("Baba Telefonu *")
+        baba_meslek = _meslek_secimi("Babasının Mesleği *", "baba")
+    with c8:
+        baba_dogum_tarihi = st.date_input(
+            "Baba Doğum Tarihi *", value=date(1975, 1, 1),
+            min_value=date(1930, 1, 1), max_value=date.today(),
+        )
+        baba_gelir = st.number_input("Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500)
+    st.markdown("Baba Doğum Yeri")
+    bd1, bd2 = st.columns(2)
+    with bd1:
+        baba_dogum_il, baba_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "baba_dogum")
+    baba_adres = st.text_area("Baba Adresi *")
+
+    st.markdown("**Anne**")
+    c9, c10 = st.columns(2)
+    with c9:
+        anne_adi = st.text_input("Anne Adı *")
+        anne_telefon = st.text_input("Anne Telefonu *")
+        anne_meslek = _meslek_secimi("Annenin Mesleği *", "anne")
+    with c10:
+        anne_dogum_tarihi = st.date_input(
+            "Anne Doğum Tarihi *", value=date(1978, 1, 1),
+            min_value=date(1930, 1, 1), max_value=date.today(),
+        )
+        anne_gelir = st.number_input("Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500)
+    st.markdown("Anne Doğum Yeri")
+    ad1, ad2 = st.columns(2)
+    with ad1:
+        anne_dogum_il, anne_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "anne_dogum")
+    anne_adres = st.text_area("Anne Adresi *")
+
+    ebeveyn_durumu = st.selectbox(
+        "Ebeveyn Medeni Durumu *",
+        ["Evli", "Boşanmış", "Baba Vefat", "Anne Vefat", "Her İkisi Vefat"],
+    )
+
+    st.markdown("### 5. Sosyoekonomik Bilgiler")
+    kardes_sayisi = st.number_input("Okumakta Olan Kardeş Sayısı *", min_value=0, max_value=15, step=1)
+    kardes_okullari = st.text_area("Kardeşlerin Okuduğu Okullar", placeholder="Yoksa boş bırakabilirsiniz")
+    sosyo_ekonomik = st.text_area(
+        "Sosyo Ekonomik Faktörler *",
+        placeholder="Aile durumunu etkileyen ek faktörler (engellilik, kronik hastalık, kira yükü vb.)",
+    )
+
+    st.markdown("### 6. Belgeler")
+    st.caption("Kabul edilen dosya türleri: PDF, JPG, PNG — dosya başına en fazla 10 MB.")
+    uploaded = {}
+    for doc in REQUIRED_DOCUMENTS:
+        uploaded[doc["key"]] = st.file_uploader(
+            f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
+        )
+
+    st.markdown("### 7. Onay")
+    onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
+
+    submitted = st.button("Başvuruyu Gönder", use_container_width=True, type="primary")
+
+    if submitted:
+        zorunlu_metin_alanlari = {
+            "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no, "E-Posta Adresi": email,
+            "Cep Telefon Numarası": telefon, "Fakülte": fakulte,
+            "Bölüm": bolum, "Mezun Olduğu Lise": lise_adi, "Lise Mezuniyet Derecesi": lise_derece,
+            "Baba Adı": baba_adi, "Baba Telefonu": baba_telefon, "Baba Adresi": baba_adres,
+            "Anne Adı": anne_adi, "Anne Telefonu": anne_telefon, "Anne Adresi": anne_adres,
+            "Sosyo Ekonomik Faktörler": sosyo_ekonomik,
+        }
+        eksikler = [ad for ad, deger in zorunlu_metin_alanlari.items() if not deger.strip()]
+
+        for il_deger, ilce_deger, ad in [
+            (dogum_il, dogum_ilce, "Öğrenci Doğum Yeri (İl/İlçe)"),
+            (nufus_il, nufus_ilce, "Nüfusa Kayıtlı Olduğu Yer (İl/İlçe)"),
+            (ikamet_il, ikamet_ilce, "İkamet Edilen İl/İlçe"),
+            (baba_dogum_il, baba_dogum_ilce, "Baba Doğum Yeri (İl/İlçe)"),
+            (anne_dogum_il, anne_dogum_ilce, "Anne Doğum Yeri (İl/İlçe)"),
+        ]:
+            if not il_deger or not ilce_deger:
+                eksikler.append(ad)
+
+        if not okul_ili:
+            eksikler.append("Okulun Bulunduğu İl")
+        if not universite:
+            eksikler.append("Üniversite Adı")
+        elif universite == "Listede Yok / Diğer" and not universite_diger.strip():
+            eksikler.append("Üniversite Adı (listede yoksa elle yazılmalı)")
+        universite_final = universite_diger.strip() if universite == "Listede Yok / Diğer" else universite
+
+        if not baba_meslek:
+            eksikler.append("Babasının Mesleği")
+        if not anne_meslek:
+            eksikler.append("Annenin Mesleği")
+
+        if len(tc_no.strip()) != 11 or not tc_no.strip().isdigit():
+            eksikler.append("T.C. Kimlik No (11 haneli olmalı)")
+        for doc in REQUIRED_DOCUMENTS:
+            if uploaded[doc["key"]] is None:
+                eksikler.append(doc["label"])
+        if not onay:
+            eksikler.append("Onay kutusu işaretlenmeli")
+
+        if eksikler:
+            st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
+        else:
+            with st.spinner("Başvurunuz gönderiliyor, lütfen bekleyin..."):
+                try:
+                    payload = {
+                        "action": "submit",
+                        "timestamp": datetime.now().isoformat(),
+                        "fields": {
+                            "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
+                            "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
+                            "Öğrenci Doğum Tarihi": str(dogum_tarihi),
+                            "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
+                            "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
+                            "İkamet İl": ikamet_il, "İkamet İlçe": ikamet_ilce,
+                            "Öğrencinin Kaldığı Yer": kaldigi_yer,
+                            "Üniversite Adı": universite_final, "Fakülte": fakulte, "Bölüm": bolum, "Sınıfı": sinif,
+                            "Okulun Bulunduğu İl": okul_ili, "Mezun Olduğu Lise": lise_adi,
+                            "Lise Mezuniyet Derecesi": lise_derece,
+                            "Baba Adı": baba_adi,
+                            "Baba Doğum Yeri İl": baba_dogum_il, "Baba Doğum Yeri İlçe": baba_dogum_ilce,
+                            "Baba Doğum Tarihi": str(baba_dogum_tarihi), "Baba Adresi": baba_adres,
+                            "Baba Telefonu": baba_telefon, "Babasının Mesleği": baba_meslek,
+                            "Babanın Aylık Geliri (TL)": baba_gelir,
+                            "Anne Adı": anne_adi,
+                            "Anne Doğum Yeri İl": anne_dogum_il, "Anne Doğum Yeri İlçe": anne_dogum_ilce,
+                            "Anne Doğum Tarihi": str(anne_dogum_tarihi), "Anne Adresi": anne_adres,
+                            "Anne Telefonu": anne_telefon, "Annenin Mesleği": anne_meslek,
+                            "Annenin Aylık Geliri (TL)": anne_gelir,
+                            "Ebeveyn Medeni Durumu": ebeveyn_durumu,
+                            "Okumakta Olan Kardeş Sayısı": kardes_sayisi,
+                            "Kardeşlerin Okuduğu Okullar": kardes_okullari,
+                            "Sosyo Ekonomik Faktörler": sosyo_ekonomik,
+                        },
+                        "files": {
+                            doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS
+                        },
+                        "folder_name": f"{ad_soyad.strip()}_{tc_no.strip()}",
+                    }
+                    result = _call_apps_script(payload)
+                    if result.get("ok"):
+                        st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
+                        st.balloons()
+                    else:
+                        st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
+                except Exception as e:
+                    st.error(f"Bir hata oluştu, lütfen tekrar deneyin. Teknik detay: {e}")
+
+# ============================================================================
+# YÖNETİCİ PANELİ
+# ============================================================================
+else:
+    st.markdown("## Yönetici Paneli")
+
+    if not st.session_state.admin_authed:
+        st.markdown("#### Yönetici Girişi")
+        u = st.text_input("Kullanıcı Adı")
+        p = st.text_input("Şifre", type="password")
+        if st.button("Giriş Yap"):
+            creds = st.secrets["admin_credentials"]
+            if u == creds["user"] and p == creds["pass"]:
+                st.session_state.admin_authed = True
+                st.rerun()
+            else:
+                st.error("Kullanıcı adı veya şifre hatalı.")
+    else:
+        if st.button("🔄 Verileri Yenile"):
+            st.cache_data.clear()
+
+        with st.spinner("Veriler alınıyor..."):
+            try:
+                data = _fetch_all_rows()
+            except Exception as e:
+                st.error(f"Veriler alınamadı: {e}")
+                st.stop()
+
+        rows = data.get("rows", [])
+        if not rows:
+            st.info("Henüz başvuru yok.")
+        else:
+            df = pd.DataFrame(rows)
+            for col in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)", "Okumakta Olan Kardeş Sayısı"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            tab_genel, tab_liste, tab_evrak = st.tabs(["📊 Genel Bakış", "📋 Başvuru Listesi", "📁 Evrak Klasörleri"])
+
+            # -------------------- GENEL BAKIŞ --------------------
+            with tab_genel:
+                incelenen = int((df.get("İncelendi", pd.Series(dtype=str)) == "Evet").sum()) if "İncelendi" in df.columns else 0
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Toplam Başvuru", len(df))
+                m2.metric("İncelenen", incelenen)
+                m3.metric("Bekleyen", len(df) - incelenen)
+                if "Babanın Aylık Geliri (TL)" in df.columns and "Annenin Aylık Geliri (TL)" in df.columns:
+                    ort_gelir = (df["Babanın Aylık Geliri (TL)"].fillna(0) + df["Annenin Aylık Geliri (TL)"].fillna(0)).mean()
+                    m4.metric("Ort. Aile Geliri (TL)", f"{ort_gelir:,.0f}")
+
+                g1, g2 = st.columns(2)
+                with g1:
+                    if "Cinsiyet" in df.columns:
+                        fig = px.pie(df, names="Cinsiyet", title="Cinsiyet Dağılımı", hole=0.5,
+                                     color_discrete_sequence=["#F5821F", "#2C2C2A"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+                        st.plotly_chart(fig, use_container_width=True)
+                with g2:
+                    if "Sınıfı" in df.columns:
+                        fig = px.bar(df["Sınıfı"].value_counts().reset_index(), x="Sınıfı", y="count",
+                                     title="Sınıf Dağılımı", color_discrete_sequence=["#F5821F"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
+                        st.plotly_chart(fig, use_container_width=True)
+
+                g3, g4 = st.columns(2)
+                with g3:
+                    if "Bölüm" in df.columns:
+                        top_bolum = df["Bölüm"].value_counts().nlargest(10).reset_index()
+                        fig = px.bar(top_bolum, x="count", y="Bölüm", orientation="h",
+                                     title="En Çok Başvurulan 10 Bölüm", color_discrete_sequence=["#F5821F"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                                           yaxis=dict(autorange="reversed"))
+                        st.plotly_chart(fig, use_container_width=True)
+                with g4:
+                    if "İkamet İl" in df.columns:
+                        top_il = df["İkamet İl"].value_counts().nlargest(10).reset_index()
+                        fig = px.bar(top_il, x="count", y="İkamet İl", orientation="h",
+                                     title="En Çok Başvuru Yapılan 10 İl", color_discrete_sequence=["#2C2C2A"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                                           yaxis=dict(autorange="reversed"))
+                        st.plotly_chart(fig, use_container_width=True)
+
+                g5, g6 = st.columns(2)
+                with g5:
+                    if "Ebeveyn Medeni Durumu" in df.columns:
+                        fig = px.bar(df["Ebeveyn Medeni Durumu"].value_counts().reset_index(),
+                                     x="Ebeveyn Medeni Durumu", y="count", title="Ebeveyn Medeni Durumu Dağılımı",
+                                     color_discrete_sequence=["#F5821F"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
+                        st.plotly_chart(fig, use_container_width=True)
+                with g6:
+                    if "Babasının Mesleği" in df.columns:
+                        fig = px.bar(df["Babasının Mesleği"].value_counts().nlargest(8).reset_index(),
+                                     x="count", y="Babasının Mesleği", orientation="h",
+                                     title="Babasının Mesleği Dağılımı", color_discrete_sequence=["#2C2C2A"])
+                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                                           yaxis=dict(autorange="reversed"))
+                        st.plotly_chart(fig, use_container_width=True)
+
+            # -------------------- BAŞVURU LİSTESİ (İncelendi işaretleme) --------------------
+            with tab_liste:
+                st.caption("İncelendi kutucuğunu işaretleyip **Değişiklikleri Kaydet**'e basın.")
+                display_cols = [c for c in df.columns if not c.startswith("Belge:")]
+                edit_df = df[display_cols].copy()
+                if "İncelendi" in edit_df.columns:
+                    edit_df["İncelendi"] = edit_df["İncelendi"].apply(lambda v: str(v).strip() == "Evet")
+
+                edited = st.data_editor(
+                    edit_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    disabled=[c for c in display_cols if c != "İncelendi"],
+                    column_config={
+                        "İncelendi": st.column_config.CheckboxColumn("İncelendi", default=False),
+                    },
+                    key="editor",
+                )
+
+                if st.button("💾 Değişiklikleri Kaydet", type="primary"):
+                    degisen = 0
+                    for i in range(len(edit_df)):
+                        eski = edit_df.iloc[i]["İncelendi"]
+                        yeni = edited.iloc[i]["İncelendi"]
+                        if eski != yeni:
+                            tc_no = edit_df.iloc[i].get("T.C. Kimlik No", "")
+                            try:
+                                _update_review_status(tc_no, "Evet" if yeni else "Hayır")
+                                degisen += 1
+                            except Exception as e:
+                                st.error(f"{tc_no} güncellenemedi: {e}")
+                    if degisen:
+                        st.success(f"{degisen} kayıt güncellendi.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.info("Değişiklik bulunamadı.")
+
+                buffer = BytesIO()
+                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                    df[display_cols].to_excel(writer, index=False, sheet_name="Basvurular")
+                st.download_button(
+                    "📥 Excel Olarak İndir",
+                    data=buffer.getvalue(),
+                    file_name=f"basvurular_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+
+            # -------------------- EVRAK KLASÖRLERİ --------------------
+            with tab_evrak:
+                if "Drive Klasör Linki" in df.columns:
+                    for _, row in df.iterrows():
+                        durum = "✅ İncelendi" if str(row.get("İncelendi", "")).strip() == "Evet" else "⏳ Bekliyor"
+                        st.markdown(
+                            f"- **{row.get('Öğrenci Adı Soyadı', '—')}** ({durum}) → "
+                            f"[Drive Klasörünü Aç]({row.get('Drive Klasör Linki', '#')})"
+                        )
+
+        if st.button("Çıkış Yap"):
+            st.session_state.admin_authed = False
+            st.rerun()
