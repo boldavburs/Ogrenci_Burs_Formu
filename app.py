@@ -219,14 +219,16 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                 unsafe_allow_html=True,
             )
         with col_logo:
-            if logo_b64:
-                st.markdown(
-                    f'<div style="display:flex; justify-content:center; align-items:center; width:100%;">'
-                    f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:100px; width:100px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:5px; object-fit:cover; display:block;" /></div>',
-                    unsafe_allow_html=True,
-                )
+    if logo_b64:
+        st.markdown(
+            f'<div style="display:flex; justify-content:center; align-items:stretch; '
+            f'width:100%; margin:-1.25rem 0;">'
+            f'<img src="data:image/png;base64,{logo_b64}" '
+            f'style="height:auto; aspect-ratio:1/1; align-self:stretch; '
+            f'border-radius:50%; background:#FFFFFF; padding:5px; object-fit:cover; '
+            f'display:block;" /></div>',
+            unsafe_allow_html=True,
+        )
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
