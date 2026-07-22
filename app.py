@@ -71,6 +71,7 @@ def _fetch_all_rows() -> dict:
     return resp.json()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def _fetch_settings() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
     resp = requests.get(
@@ -147,7 +148,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         """
         <style>
         .st-key-ust_serit_kutu { background:#F5821F; border-radius:12px;
-            padding:1.25rem 2rem; margin-bottom:1.5rem; }
+            padding:1.25rem 2rem; margin-bottom:1.5rem; position:relative; }
         .st-key-ust_serit_kutu button { background:#FFFFFF !important; }
         </style>
         """,
@@ -155,22 +156,21 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
     )
     tiklandi = False
     with st.container(key="ust_serit_kutu"):
-        col_baslik, col_logo, col_buton = st.columns([5, 1.3, 1.4], vertical_alignment="center")
+        if logo_b64:
+            st.markdown(
+                f'<img src="data:image/png;base64,{logo_b64}" '
+                f'style="position:absolute; left:50%; top:50%; '
+                f'transform:translate(-50%, -50%); height:78px; width:78px; '
+                f'border-radius:50%; background:#FFFFFF; padding:4px; object-fit:cover;" />',
+                unsafe_allow_html=True,
+            )
+        col_baslik, col_bosluk, col_buton = st.columns([5, 2.6, 1.4], vertical_alignment="center")
         with col_baslik:
             st.markdown(
                 f"<p style='color:#FFFFFF; font-size:24px; font-weight:600; margin:0;'>{baslik}</p>"
                 f"<p style='color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;'>{alt_baslik}</p>",
                 unsafe_allow_html=True,
             )
-        with col_logo:
-            if logo_b64:
-                st.markdown(
-                    f'<div style="display:flex; justify-content:center;">'
-                    f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:78px; width:78px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:4px; object-fit:cover;" /></div>',
-                    unsafe_allow_html=True,
-                )
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
