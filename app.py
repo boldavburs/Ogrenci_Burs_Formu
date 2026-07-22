@@ -218,19 +218,23 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                 f"<p style='color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;'>{alt_baslik}</p>",
                 unsafe_allow_html=True,
             )
-        with col_logo:
-            if logo_b64:
-                st.markdown(
-                    f'<div style="position:absolute; top:0; bottom:0; left:50%; '
-                    f'transform:translateX(-50%); display:flex; align-items:center;">'
-                    f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:100%; aspect-ratio:1/1; border-radius:50%; '
-                    f'background:#FFFFFF; padding:5px; object-fit:cover; display:block;" /></div>',
-                    unsafe_allow_html=True,
-                )
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
+        # NOT: Logo BİLEREK sütunların DIŞINDA, konteynerin doğrudan çocuğu olarak
+        # ekleniyor. Sütun kutuları içeriği kendi dar sınırlarına göre kırptığı için
+        # (overflow), absolute konumlandırılmış logo bir sütunun İÇİNDE kalırsa
+        # kenarları kesiliyor ve sadece küçük bir nokta görünüyordu. Konteynerin
+        # doğrudan çocuğu olduğunda böyle bir kırpma olmuyor.
+        if logo_b64:
+            st.markdown(
+                f'<div style="position:absolute; top:50%; left:50%; '
+                f'transform:translate(-50%, -50%); z-index:2;">'
+                f'<img src="data:image/png;base64,{logo_b64}" '
+                f'style="height:92px; width:92px; border-radius:50%; '
+                f'background:#FFFFFF; padding:5px; object-fit:cover; display:block;" /></div>',
+                unsafe_allow_html=True,
+            )
     return tiklandi
 
 
