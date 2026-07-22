@@ -221,10 +221,10 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         with col_logo:
             if logo_b64:
                 st.markdown(
-                    f'<div style="display:flex; justify-content:center; align-items:center;">'
+                    f'<div style="display:flex; justify-content:center; align-items:center; width:100%;">'
                     f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:72px; width:72px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:4px; object-fit:cover; display:block;" /></div>',
+                    f'style="height:100px; width:100px; border-radius:50%; background:#FFFFFF; '
+                    f'padding:5px; object-fit:cover; display:block;" /></div>',
                     unsafe_allow_html=True,
                 )
         with col_buton:
