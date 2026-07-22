@@ -192,49 +192,33 @@ def _logo_base64():
 
 
 def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key: str = "ust_serit_btn") -> bool:
-    logo_b64 = _logo_base64()
     st.markdown(
         """
         <style>
         .st-key-ust_serit_kutu { background:#F5821F; border-radius:12px;
-            padding:1.25rem 2rem; margin-bottom:1.5rem; position:relative; }
+            padding:1.25rem 2rem; margin-bottom:1.5rem; }
         .st-key-ust_serit_kutu button { background:#FFFFFF !important; }
         </style>
         """,
         unsafe_allow_html=True,
     )
     tiklandi = False
-    # NOT: Sol ve sağ kenar kolonları BİLEREK eşit toplam genişlikte (3 birim) tutulur.
-    # Bu sayede logo kolonu, içeriğin uzunluğundan bağımsız olarak matematiksel
-    # olarak tam ortada kalır (position:absolute yerine simetrik kolon genişliği kullanıldı,
-    # çünkü absolute konumlandırma bazı Streamlit sürümlerinde şeridin dışına taşabiliyor).
     with st.container(key="ust_serit_kutu"):
-        col_baslik, col_logo, col_bosluk, col_buton = st.columns(
-            [3, 1.4, 1.4, 1.6], vertical_alignment="center"
-        )
+        col_baslik, col_logo, col_buton = st.columns([3, 2, 1.6], vertical_alignment="center")
         with col_baslik:
             st.markdown(
                 f"<p style='color:#FFFFFF; font-size:24px; font-weight:600; margin:0;'>{baslik}</p>"
                 f"<p style='color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;'>{alt_baslik}</p>",
                 unsafe_allow_html=True,
             )
+        with col_logo:
+            try:
+                st.image("logo.png", width=110)
+            except Exception:
+                pass
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
-        # NOT: Logo BİLEREK sütunların DIŞINDA, konteynerin doğrudan çocuğu olarak
-        # ekleniyor. Sütun kutuları içeriği kendi dar sınırlarına göre kırptığı için
-        # (overflow), absolute konumlandırılmış logo bir sütunun İÇİNDE kalırsa
-        # kenarları kesiliyor ve sadece küçük bir nokta görünüyordu. Konteynerin
-        # doğrudan çocuğu olduğunda böyle bir kırpma olmuyor.
-        if logo_b64:
-            st.markdown(
-                f'<div style="position:absolute; top:20%; bottom:0; left:50%; '
-                f'transform:translateX(-50%); display:flex; align-items:center; z-index:2;">'
-                f'<img src="data:image/png;base64,{logo_b64}" '
-                f'style="height:92px; width:92px; border-radius:50%; '
-                f'background:#FFFFFF; padding:5px; object-fit:cover; display:block;" /></div>',
-                unsafe_allow_html=True,
-            )
     return tiklandi
 
 
