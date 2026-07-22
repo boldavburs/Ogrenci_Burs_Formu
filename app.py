@@ -71,6 +71,29 @@ def _fetch_all_rows() -> dict:
     return resp.json()
 
 
+def _fetch_settings() -> dict:
+    url = st.secrets["APPS_SCRIPT_URL"]
+    resp = requests.get(
+        url,
+        params={"action": "get_settings", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _update_settings(aktif: str, donem: str) -> bool:
+    payload = {
+        "action": "update_settings",
+        "aktif": aktif,
+        "donem": donem,
+        "secret": st.secrets["APPS_SCRIPT_SECRET"],
+    }
+    resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("ok", False)
+
+
 def _file_to_b64(uploaded_file) -> dict:
     data = uploaded_file.getvalue()
     return {
@@ -100,6 +123,77 @@ def _meslek_secimi(label: str, prefix: str):
     return meslek_diger.strip() if meslek == "Diğer" else meslek
 
 
+def _logo_base64():
+    try:
+        with open("logo.png", "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        return None
+
+
+def _ust_serit(baslik: str, alt_baslik: str):
+    logo_b64 = _logo_base64()
+    logo_html = (
+        f'<img src="data:image/png;base64,{logo_b64}" '
+        f'style="height:64px; width:64px; border-radius:50%; background:#FFFFFF; '
+        f'padding:4px; object-fit:cover; flex-shrink:0;" />'
+        if logo_b64 else ""
+    )
+    st.markdown(
+        f"""
+        <div style="background:#F5821F; border-radius:12px; padding:1.75rem 2rem;
+                    display:flex; justify-content:space-between; align-items:center;
+                    margin-bottom:1.5rem;">
+            <div>
+                <p style="color:#FFFFFF; font-size:24px; font-weight:600; margin:0;">{baslik}</p>
+                <p style="color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;">{alt_baslik}</p>
+            </div>
+            {logo_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _bolum_basligi(numara: str, baslik: str):
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:10px; margin:1.75rem 0 1rem;">
+            <div style="width:26px; height:26px; border-radius:50%; background:#F5821F;
+                        color:#FFFFFF; font-size:13px; font-weight:600; display:flex;
+                        align-items:center; justify-content:center; flex-shrink:0;">{numara}</div>
+            <p style="font-size:16px; font-weight:600; margin:0; color:#111111;">{baslik}</p>
+        </div>
+        <hr style="margin:-6px 0 1rem; border:none; border-top:1px solid #E5E5E5;">
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+@st.dialog("Başvuruyu Onaylayın")
+def _onay_dialogu():
+    st.write("Bilgilerinizi kontrol ettiniz mi? Başvuru gönderildikten sonra düzenleyemezsiniz.")
+    st.write("**Başvuruyu göndermek istediğinizden emin misiniz?**")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Evet, Gönder", type="primary", use_container_width=True):
+            with st.spinner("Başvurunuz gönderiliyor, lütfen bekleyin..."):
+                try:
+                    result = _call_apps_script(st.session_state["pending_payload"])
+                    if result.get("ok"):
+                        st.session_state["confirm_pending"] = False
+                        st.session_state["submit_success"] = True
+                        st.rerun()
+                    else:
+                        st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
+                except Exception as e:
+                    st.error(f"Bir hata oluştu, lütfen tekrar deneyin. Teknik detay: {e}")
+    with col2:
+        if st.button("Vazgeç", use_container_width=True):
+            st.session_state["confirm_pending"] = False
+            st.rerun()
+
+
 # ============================================================================
 # NAVİGASYON
 # ============================================================================
@@ -108,7 +202,7 @@ if "view" not in st.session_state:
 if "admin_authed" not in st.session_state:
     st.session_state.admin_authed = False
 
-col_a, col_b, col_c = st.columns([5, 1, 1])
+col_a, col_b = st.columns([6, 1])
 with col_b:
     if st.session_state.view == "form":
         if st.button("Yönetici Girişi", use_container_width=True):
@@ -118,11 +212,6 @@ with col_b:
         if st.button("Forma Dön", use_container_width=True):
             st.session_state.view = "form"
             st.rerun()
-with col_c:
-    try:
-        st.image("logo.png", width=70)
-    except Exception:
-        pass
 
 # ============================================================================
 # ÖĞRENCİ BAŞVURU FORMU
@@ -133,10 +222,28 @@ with col_c:
 # sadece "gönder" butonuna basılınca güncellenir ve ilçe listesi o ana kadar
 # bayat kalırdı. Bu yüzden gönderim ayrı bir st.button ile tetiklenir.
 if st.session_state.view == "form":
-    st.markdown("## Öğrenci Bilgi ve Başvuru Formu")
-    st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin.")
+    try:
+        ayarlar = _fetch_settings()
+    except Exception as e:
+        ayarlar = {"ok": False}
+        st.error(f"Form ayarları alınamadı, lütfen sayfayı yenileyin. Teknik detay: {e}")
 
-    st.markdown("### 1. Öğrenci Bilgileri")
+    donem_adi = ayarlar.get("donem", "") if ayarlar.get("ok") else ""
+    aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
+
+    alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
+    _ust_serit("Öğrenci Bilgi ve Başvuru Formu", alt_baslik)
+
+    if not ayarlar.get("ok"):
+        st.stop()
+
+    if not aktif_mi:
+        st.warning("📌 Başvurular şu anda kapalıdır. Yeni dönem başvuruları açıldığında bu sayfadan duyurulacaktır.")
+        st.stop()
+
+    st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
+
+    _bolum_basligi("1", "Öğrenci Bilgileri")
     c1, c2 = st.columns(2)
     with c1:
         ad_soyad = st.text_input("Öğrenci Adı Soyadı *")
@@ -159,7 +266,7 @@ if st.session_state.view == "form":
     with n1:
         nufus_il, nufus_ilce = _il_ilce_secimi("İl *", "İlçe *", "nufus_kayit")
 
-    st.markdown("### 2. İkamet Bilgisi")
+    _bolum_basligi("2", "İkamet Bilgisi")
     c3, c4 = st.columns(2)
     with c3:
         ikamet_il, ikamet_ilce = _il_ilce_secimi("İkamet Edilen İl *", "İkamet Edilen İlçe *", "ikamet")
@@ -169,7 +276,7 @@ if st.session_state.view == "form":
             ["Aile Yanında", "Yurtta", "Kirada / Arkadaşlarıyla", "Akraba Yanında", "Diğer"],
         )
 
-    st.markdown("### 3. Eğitim Bilgileri")
+    _bolum_basligi("3", "Eğitim Bilgileri")
     c5, c6 = st.columns(2)
     with c5:
         universite = st.selectbox(
@@ -187,7 +294,7 @@ if st.session_state.view == "form":
         lise_derece = st.text_input("Lise Mezuniyet Derecesi / Ortalaması *")
     lise_adi = st.text_input("Mezun Olduğu Lise ve Dengi Okul *")
 
-    st.markdown("### 4. Aile Bilgileri")
+    _bolum_basligi("4", "Aile Bilgileri")
     st.markdown("**Baba**")
     c7, c8 = st.columns(2)
     with c7:
@@ -229,15 +336,18 @@ if st.session_state.view == "form":
         ["Evli", "Boşanmış", "Baba Vefat", "Anne Vefat", "Her İkisi Vefat"],
     )
 
-    st.markdown("### 5. Sosyoekonomik Bilgiler")
+    _bolum_basligi("5", "Sosyoekonomik Bilgiler")
     kardes_sayisi = st.number_input("Okumakta Olan Kardeş Sayısı *", min_value=0, max_value=15, step=1)
-    kardes_okullari = st.text_area("Kardeşlerin Okuduğu Okullar", placeholder="Yoksa boş bırakabilirsiniz")
+    kardes_okullari = st.text_area(
+        "Kardeşlerin Okuduğu Okullar *",
+        placeholder="Okuyan kardeşiniz yoksa 'Yok' yazınız",
+    )
     sosyo_ekonomik = st.text_area(
         "Sosyo Ekonomik Faktörler *",
         placeholder="Aile durumunu etkileyen ek faktörler (engellilik, kronik hastalık, kira yükü vb.)",
     )
 
-    st.markdown("### 6. Belgeler")
+    _bolum_basligi("6", "Belgeler")
     st.caption("Kabul edilen dosya türleri: PDF, JPG, PNG — dosya başına en fazla 10 MB.")
     uploaded = {}
     for doc in REQUIRED_DOCUMENTS:
@@ -245,7 +355,7 @@ if st.session_state.view == "form":
             f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
         )
 
-    st.markdown("### 7. Onay")
+    _bolum_basligi("7", "Onay")
     onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
 
     submitted = st.button("Başvuruyu Gönder", use_container_width=True, type="primary")
@@ -257,7 +367,7 @@ if st.session_state.view == "form":
             "Bölüm": bolum, "Mezun Olduğu Lise": lise_adi, "Lise Mezuniyet Derecesi": lise_derece,
             "Baba Adı": baba_adi, "Baba Telefonu": baba_telefon, "Baba Adresi": baba_adres,
             "Anne Adı": anne_adi, "Anne Telefonu": anne_telefon, "Anne Adresi": anne_adres,
-            "Sosyo Ekonomik Faktörler": sosyo_ekonomik,
+            "Sosyo Ekonomik Faktörler": sosyo_ekonomik, "Kardeşlerin Okuduğu Okullar": kardes_okullari,
         }
         eksikler = [ad for ad, deger in zorunlu_metin_alanlari.items() if not deger.strip()]
 
@@ -295,56 +405,57 @@ if st.session_state.view == "form":
         if eksikler:
             st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
         else:
-            with st.spinner("Başvurunuz gönderiliyor, lütfen bekleyin..."):
-                try:
-                    payload = {
-                        "action": "submit",
-                        "timestamp": datetime.now().isoformat(),
-                        "fields": {
-                            "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
-                            "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
-                            "Öğrenci Doğum Tarihi": str(dogum_tarihi),
-                            "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
-                            "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
-                            "İkamet İl": ikamet_il, "İkamet İlçe": ikamet_ilce,
-                            "Öğrencinin Kaldığı Yer": kaldigi_yer,
-                            "Üniversite Adı": universite_final, "Fakülte": fakulte, "Bölüm": bolum, "Sınıfı": sinif,
-                            "Okulun Bulunduğu İl": okul_ili, "Mezun Olduğu Lise": lise_adi,
-                            "Lise Mezuniyet Derecesi": lise_derece,
-                            "Baba Adı": baba_adi,
-                            "Baba Doğum Yeri İl": baba_dogum_il, "Baba Doğum Yeri İlçe": baba_dogum_ilce,
-                            "Baba Doğum Tarihi": str(baba_dogum_tarihi), "Baba Adresi": baba_adres,
-                            "Baba Telefonu": baba_telefon, "Babasının Mesleği": baba_meslek,
-                            "Babanın Aylık Geliri (TL)": baba_gelir,
-                            "Anne Adı": anne_adi,
-                            "Anne Doğum Yeri İl": anne_dogum_il, "Anne Doğum Yeri İlçe": anne_dogum_ilce,
-                            "Anne Doğum Tarihi": str(anne_dogum_tarihi), "Anne Adresi": anne_adres,
-                            "Anne Telefonu": anne_telefon, "Annenin Mesleği": anne_meslek,
-                            "Annenin Aylık Geliri (TL)": anne_gelir,
-                            "Ebeveyn Medeni Durumu": ebeveyn_durumu,
-                            "Okumakta Olan Kardeş Sayısı": kardes_sayisi,
-                            "Kardeşlerin Okuduğu Okullar": kardes_okullari,
-                            "Sosyo Ekonomik Faktörler": sosyo_ekonomik,
-                        },
-                        "files": {
-                            doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS
-                        },
-                        "folder_name": f"{ad_soyad.strip()}_{tc_no.strip()}",
-                    }
-                    result = _call_apps_script(payload)
-                    if result.get("ok"):
-                        st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
-                        st.balloons()
-                    else:
-                        st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
-                except Exception as e:
-                    st.error(f"Bir hata oluştu, lütfen tekrar deneyin. Teknik detay: {e}")
+            payload = {
+                "action": "submit",
+                "timestamp": datetime.now().isoformat(),
+                "fields": {
+                    "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
+                    "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
+                    "Öğrenci Doğum Tarihi": str(dogum_tarihi),
+                    "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
+                    "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
+                    "İkamet İl": ikamet_il, "İkamet İlçe": ikamet_ilce,
+                    "Öğrencinin Kaldığı Yer": kaldigi_yer,
+                    "Üniversite Adı": universite_final, "Fakülte": fakulte, "Bölüm": bolum, "Sınıfı": sinif,
+                    "Okulun Bulunduğu İl": okul_ili, "Mezun Olduğu Lise": lise_adi,
+                    "Lise Mezuniyet Derecesi": lise_derece,
+                    "Baba Adı": baba_adi,
+                    "Baba Doğum Yeri İl": baba_dogum_il, "Baba Doğum Yeri İlçe": baba_dogum_ilce,
+                    "Baba Doğum Tarihi": str(baba_dogum_tarihi), "Baba Adresi": baba_adres,
+                    "Baba Telefonu": baba_telefon, "Babasının Mesleği": baba_meslek,
+                    "Babanın Aylık Geliri (TL)": baba_gelir,
+                    "Anne Adı": anne_adi,
+                    "Anne Doğum Yeri İl": anne_dogum_il, "Anne Doğum Yeri İlçe": anne_dogum_ilce,
+                    "Anne Doğum Tarihi": str(anne_dogum_tarihi), "Anne Adresi": anne_adres,
+                    "Anne Telefonu": anne_telefon, "Annenin Mesleği": anne_meslek,
+                    "Annenin Aylık Geliri (TL)": anne_gelir,
+                    "Ebeveyn Medeni Durumu": ebeveyn_durumu,
+                    "Okumakta Olan Kardeş Sayısı": kardes_sayisi,
+                    "Kardeşlerin Okuduğu Okullar": kardes_okullari,
+                    "Sosyo Ekonomik Faktörler": sosyo_ekonomik,
+                },
+                "files": {
+                    doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS
+                },
+                "folder_name": f"{ad_soyad.strip()}_{tc_no.strip()}",
+            }
+            st.session_state["pending_payload"] = payload
+            st.session_state["confirm_pending"] = True
+            st.rerun()
+
+    if st.session_state.get("confirm_pending"):
+        _onay_dialogu()
+
+    if st.session_state.get("submit_success"):
+        st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
+        st.balloons()
+        st.session_state["submit_success"] = False
 
 # ============================================================================
 # YÖNETİCİ PANELİ
 # ============================================================================
 else:
-    st.markdown("## Yönetici Paneli")
+    _ust_serit("Yönetici Paneli", "Bol-Dav Bolvadinliler Dayanışma Vakfı")
 
     if not st.session_state.admin_authed:
         st.markdown("#### Yönetici Girişi")
@@ -361,6 +472,35 @@ else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
 
+        with st.expander("⚙️ Anket Ayarları (Aktif/Pasif ve Dönem Adı)", expanded=False):
+            try:
+                mevcut_ayarlar = _fetch_settings()
+            except Exception as e:
+                mevcut_ayarlar = {"ok": False}
+                st.error(f"Ayarlar alınamadı: {e}")
+
+            if mevcut_ayarlar.get("ok"):
+                yeni_donem = st.text_input(
+                    "Dönem Adı", value=mevcut_ayarlar.get("donem", ""),
+                    placeholder="örn. 2024-2025 Dönemi",
+                )
+                yeni_aktif = st.toggle(
+                    "Başvurular Açık (Aktif)", value=mevcut_ayarlar.get("aktif") == "Evet",
+                )
+                if st.button("💾 Ayarları Kaydet"):
+                    try:
+                        basarili = _update_settings("Evet" if yeni_aktif else "Hayır", yeni_donem.strip())
+                        if basarili:
+                            st.success("Ayarlar güncellendi.")
+                        else:
+                            st.error("Ayarlar güncellenemedi.")
+                    except Exception as e:
+                        st.error(f"Ayarlar güncellenemedi: {e}")
+                st.caption(
+                    "Pasif yapıldığında öğrenciler form sayfasında 'Başvurular şu anda kapalıdır' "
+                    "mesajını görür. Dönem adı hem formda hem Drive klasör isimlerinde kullanılır."
+                )
+
         with st.spinner("Veriler alınıyor..."):
             try:
                 data = _fetch_all_rows()
@@ -372,12 +512,21 @@ else:
         if not rows:
             st.info("Henüz başvuru yok.")
         else:
-            df = pd.DataFrame(rows)
+            df_tum = pd.DataFrame(rows)
             for col in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)", "Okumakta Olan Kardeş Sayısı"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
+                if col in df_tum.columns:
+                    df_tum[col] = pd.to_numeric(df_tum[col], errors="coerce")
 
-            tab_genel, tab_liste, tab_evrak = st.tabs(["📊 Genel Bakış", "📋 Başvuru Listesi", "📁 Evrak Klasörleri"])
+            if "Dönem" in df_tum.columns:
+                donemler = ["Tümü"] + sorted(df_tum["Dönem"].dropna().unique().tolist(), reverse=True)
+                secilen_donem = st.selectbox("📅 Dönem Filtrele", donemler)
+                df = df_tum if secilen_donem == "Tümü" else df_tum[df_tum["Dönem"] == secilen_donem]
+            else:
+                df = df_tum
+
+            tab_genel, tab_liste, tab_evrak = st.tabs(
+                ["📊 Genel Bakış", "📋 Başvuru Listesi", "📁 Evrak Klasörleri"]
+            )
 
             # -------------------- GENEL BAKIŞ --------------------
             with tab_genel:
