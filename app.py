@@ -82,16 +82,26 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
-def _update_settings(aktif: str, donem: str) -> bool:
+def _fetch_donemler() -> dict:
+    url = st.secrets["APPS_SCRIPT_URL"]
+    resp = requests.get(
+        url,
+        params={"action": "get_donemler", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _sync_donemler(donemler: list) -> dict:
     payload = {
-        "action": "update_settings",
-        "aktif": aktif,
-        "donem": donem,
+        "action": "sync_donemler",
+        "donemler": donemler,
         "secret": st.secrets["APPS_SCRIPT_SECRET"],
     }
     resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
     resp.raise_for_status()
-    return resp.json().get("ok", False)
+    return resp.json()
 
 
 def _file_to_b64(uploaded_file) -> dict:
@@ -131,28 +141,40 @@ def _logo_base64():
         return None
 
 
-def _ust_serit(baslik: str, alt_baslik: str):
+def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key: str = "ust_serit_btn") -> bool:
     logo_b64 = _logo_base64()
-    logo_html = (
-        f'<img src="data:image/png;base64,{logo_b64}" '
-        f'style="height:64px; width:64px; border-radius:50%; background:#FFFFFF; '
-        f'padding:4px; object-fit:cover; flex-shrink:0;" />'
-        if logo_b64 else ""
-    )
     st.markdown(
-        f"""
-        <div style="background:#F5821F; border-radius:12px; padding:1.75rem 2rem;
-                    display:flex; justify-content:space-between; align-items:center;
-                    margin-bottom:1.5rem;">
-            <div>
-                <p style="color:#FFFFFF; font-size:24px; font-weight:600; margin:0;">{baslik}</p>
-                <p style="color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;">{alt_baslik}</p>
-            </div>
-            {logo_html}
-        </div>
+        """
+        <style>
+        .st-key-ust_serit_kutu { background:#F5821F; border-radius:12px;
+            padding:1.25rem 2rem; margin-bottom:1.5rem; }
+        .st-key-ust_serit_kutu button { background:#FFFFFF !important; }
+        </style>
         """,
         unsafe_allow_html=True,
     )
+    tiklandi = False
+    with st.container(key="ust_serit_kutu"):
+        col_baslik, col_logo, col_buton = st.columns([5, 1.3, 1.4], vertical_alignment="center")
+        with col_baslik:
+            st.markdown(
+                f"<p style='color:#FFFFFF; font-size:24px; font-weight:600; margin:0;'>{baslik}</p>"
+                f"<p style='color:#FFFFFF; font-size:14px; margin:6px 0 0; opacity:0.92;'>{alt_baslik}</p>",
+                unsafe_allow_html=True,
+            )
+        with col_logo:
+            if logo_b64:
+                st.markdown(
+                    f'<div style="display:flex; justify-content:center;">'
+                    f'<img src="data:image/png;base64,{logo_b64}" '
+                    f'style="height:78px; width:78px; border-radius:50%; background:#FFFFFF; '
+                    f'padding:4px; object-fit:cover;" /></div>',
+                    unsafe_allow_html=True,
+                )
+        with col_buton:
+            if buton_metni:
+                tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
+    return tiklandi
 
 
 def _bolum_basligi(numara: str, baslik: str):
@@ -202,17 +224,6 @@ if "view" not in st.session_state:
 if "admin_authed" not in st.session_state:
     st.session_state.admin_authed = False
 
-col_a, col_b = st.columns([6, 1])
-with col_b:
-    if st.session_state.view == "form":
-        if st.button("Yönetici Girişi", use_container_width=True):
-            st.session_state.view = "admin"
-            st.rerun()
-    else:
-        if st.button("Forma Dön", use_container_width=True):
-            st.session_state.view = "form"
-            st.rerun()
-
 # ============================================================================
 # ÖĞRENCİ BAŞVURU FORMU
 # ============================================================================
@@ -232,7 +243,9 @@ if st.session_state.view == "form":
     aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
 
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
-    _ust_serit("Öğrenci Bilgi ve Başvuru Formu", alt_baslik)
+    if _ust_serit("Öğrenci Bilgi ve Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
+        st.session_state.view = "admin"
+        st.rerun()
 
     if not ayarlar.get("ok"):
         st.stop()
@@ -455,7 +468,9 @@ if st.session_state.view == "form":
 # YÖNETİCİ PANELİ
 # ============================================================================
 else:
-    _ust_serit("Yönetici Paneli", "Bol-Dav Bolvadinliler Dayanışma Vakfı")
+    if _ust_serit("Yönetici Paneli", "Bol-Dav Bolvadinliler Dayanışma Vakfı", "Forma Dön", "btn_forma_don"):
+        st.session_state.view = "form"
+        st.rerun()
 
     if not st.session_state.admin_authed:
         st.markdown("#### Yönetici Girişi")
@@ -472,34 +487,56 @@ else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
 
-        with st.expander("⚙️ Anket Ayarları (Aktif/Pasif ve Dönem Adı)", expanded=False):
+        with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=False):
             try:
-                mevcut_ayarlar = _fetch_settings()
+                donem_sonuc = _fetch_donemler()
             except Exception as e:
-                mevcut_ayarlar = {"ok": False}
-                st.error(f"Ayarlar alınamadı: {e}")
+                donem_sonuc = {"ok": False}
+                st.error(f"Dönemler alınamadı: {e}")
 
-            if mevcut_ayarlar.get("ok"):
-                yeni_donem = st.text_input(
-                    "Dönem Adı", value=mevcut_ayarlar.get("donem", ""),
-                    placeholder="örn. 2024-2025 Dönemi",
-                )
-                yeni_aktif = st.toggle(
-                    "Başvurular Açık (Aktif)", value=mevcut_ayarlar.get("aktif") == "Evet",
-                )
-                if st.button("💾 Ayarları Kaydet"):
-                    try:
-                        basarili = _update_settings("Evet" if yeni_aktif else "Hayır", yeni_donem.strip())
-                        if basarili:
-                            st.success("Ayarlar güncellendi.")
-                        else:
-                            st.error("Ayarlar güncellenemedi.")
-                    except Exception as e:
-                        st.error(f"Ayarlar güncellenemedi: {e}")
+            if donem_sonuc.get("ok"):
                 st.caption(
-                    "Pasif yapıldığında öğrenciler form sayfasında 'Başvurular şu anda kapalıdır' "
-                    "mesajını görür. Dönem adı hem formda hem Drive klasör isimlerinde kullanılır."
+                    "Tabloya yeni satır ekleyerek yeni dönem oluşturun, isimleri doğrudan düzenleyin, "
+                    "satır silmek için satırın solundaki kutucuğu işaretleyip çöp kutusuna basın. "
+                    "**Aynı anda yalnızca bir dönem 'Aktif' olabilir** — o dönem formda görünür ve "
+                    "başvuruları/dosyaları kendi Drive klasörüne kaydeder."
                 )
+                donem_df = pd.DataFrame(donem_sonuc.get("donemler", []))
+                if donem_df.empty:
+                    donem_df = pd.DataFrame([{"ad": "", "durum": "Pasif"}])
+
+                edited_donem_df = st.data_editor(
+                    donem_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="dynamic",
+                    column_config={
+                        "ad": st.column_config.TextColumn("Dönem Adı", required=True),
+                        "durum": st.column_config.SelectboxColumn("Durum", options=["Aktif", "Pasif"], required=True),
+                    },
+                    key="donem_editor",
+                )
+
+                if st.button("💾 Dönemleri Kaydet", type="primary"):
+                    temiz_liste = [
+                        {"ad": str(r["ad"]).strip(), "durum": r["durum"]}
+                        for _, r in edited_donem_df.iterrows()
+                        if str(r["ad"]).strip()
+                    ]
+                    aktif_sayisi = sum(1 for d in temiz_liste if d["durum"] == "Aktif")
+                    if aktif_sayisi > 1:
+                        st.error("Aynı anda sadece bir dönem 'Aktif' olabilir. Lütfen sadece birini seçin.")
+                    else:
+                        try:
+                            sonuc = _sync_donemler(temiz_liste)
+                            if sonuc.get("ok"):
+                                st.success("Dönemler güncellendi.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
+                        except Exception as e:
+                            st.error(f"Güncellenemedi: {e}")
 
         with st.spinner("Veriler alınıyor..."):
             try:
