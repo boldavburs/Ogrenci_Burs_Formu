@@ -26,6 +26,11 @@ MESLEK_SECENEKLERI = [
     "Ev Hanımı", "İşsiz / Çalışmıyor", "Vefat Etti", "Diğer",
 ]
 
+TURKCE_AYLAR = [
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+]
+
 try:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
 except Exception:
@@ -181,6 +186,33 @@ def _meslek_secimi(label: str, prefix: str):
     if meslek == "Diğer":
         meslek_diger = st.text_input("Mesleği yazın", key=f"{prefix}_meslek_diger")
     return meslek_diger.strip() if meslek == "Diğer" else meslek
+
+
+def _turkce_tarih_secimi(label: str, prefix: str, varsayilan: date, min_yil: int, max_yil: int):
+    """Takvim yerine Gün/Ay/Yıl seçim kutuları — ay isimleri Türkçe, tam kontrol bizde."""
+    st.markdown(f"<p style='font-size:14px; color:#31333F; margin-bottom:2px;'>{label}</p>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        gun = st.selectbox(
+            "Gün", list(range(1, 32)), index=varsayilan.day - 1,
+            key=f"{prefix}_gun", label_visibility="collapsed",
+        )
+    with c2:
+        ay = st.selectbox(
+            "Ay", TURKCE_AYLAR, index=varsayilan.month - 1,
+            key=f"{prefix}_ay", label_visibility="collapsed",
+        )
+    with c3:
+        yil_listesi = list(range(max_yil, min_yil - 1, -1))
+        yil = st.selectbox(
+            "Yıl", yil_listesi, index=yil_listesi.index(varsayilan.year),
+            key=f"{prefix}_yil", label_visibility="collapsed",
+        )
+    ay_no = TURKCE_AYLAR.index(ay) + 1
+    try:
+        return date(yil, ay_no, gun)
+    except ValueError:
+        return None  # örn. 30 Şubat gibi geçersiz kombinasyon
 
 
 def _logo_base64():
@@ -351,10 +383,9 @@ if st.session_state.view == "form":
         cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
         email = st.text_input("E-Posta Adresi *")
     telefon = st.text_input("Cep Telefon Numarası *", placeholder="05xx xxx xx xx")
-    dogum_tarihi = st.date_input(
-        "Öğrenci Doğum Tarihi *", value=date(2004, 1, 1),
-        min_value=date(1980, 1, 1), max_value=date.today(),
-        format="DD/MM/YYYY",
+    dogum_tarihi = _turkce_tarih_secimi(
+        "Öğrenci Doğum Tarihi *", "ogrenci_dogum_tarihi",
+        varsayilan=date(2004, 1, 1), min_yil=1980, max_yil=date.today().year,
     )
 
     st.markdown("**Öğrenci Doğum Yeri**")
@@ -400,14 +431,16 @@ if st.session_state.view == "form":
     with c7:
         baba_adi = st.text_input("Baba Adı *")
         baba_telefon = st.text_input("Baba Telefonu *")
-        baba_meslek = _meslek_secimi("Babasının Mesleği *", "baba")
     with c8:
-        baba_dogum_tarihi = st.date_input(
-            "Baba Doğum Tarihi *", value=date(1975, 1, 1),
-            min_value=date(1930, 1, 1), max_value=date.today(),
-            format="DD/MM/YYYY",
+        baba_meslek = _meslek_secimi("Babasının Mesleği *", "baba")
+        baba_gelir = st.number_input(
+            "Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500,
+            value=None, placeholder="Örn: 15000",
         )
-        baba_gelir = st.number_input("Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500)
+    baba_dogum_tarihi = _turkce_tarih_secimi(
+        "Baba Doğum Tarihi *", "baba_dogum_tarihi",
+        varsayilan=date(1975, 1, 1), min_yil=1930, max_yil=date.today().year,
+    )
     st.markdown("Baba Doğum Yeri")
     bd1, bd2 = st.columns(2)
     with bd1:
@@ -419,14 +452,16 @@ if st.session_state.view == "form":
     with c9:
         anne_adi = st.text_input("Anne Adı *")
         anne_telefon = st.text_input("Anne Telefonu *")
-        anne_meslek = _meslek_secimi("Annenin Mesleği *", "anne")
     with c10:
-        anne_dogum_tarihi = st.date_input(
-            "Anne Doğum Tarihi *", value=date(1978, 1, 1),
-            min_value=date(1930, 1, 1), max_value=date.today(),
-            format="DD/MM/YYYY",
+        anne_meslek = _meslek_secimi("Annenin Mesleği *", "anne")
+        anne_gelir = st.number_input(
+            "Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500,
+            value=None, placeholder="Örn: 10000",
         )
-        anne_gelir = st.number_input("Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500)
+    anne_dogum_tarihi = _turkce_tarih_secimi(
+        "Anne Doğum Tarihi *", "anne_dogum_tarihi",
+        varsayilan=date(1978, 1, 1), min_yil=1930, max_yil=date.today().year,
+    )
     st.markdown("Anne Doğum Yeri")
     ad1, ad2 = st.columns(2)
     with ad1:
@@ -466,7 +501,10 @@ if st.session_state.view == "form":
             elif tip == "Sayı":
                 ek_cevaplar[soru_id] = st.number_input(soru_metni, step=1, key=f"eksoru_{soru_id}")
             elif tip == "Tarih":
-                ek_cevaplar[soru_id] = st.date_input(soru_metni, key=f"eksoru_{soru_id}", format="DD/MM/YYYY")
+                ek_cevaplar[soru_id] = _turkce_tarih_secimi(
+                    soru_metni, f"eksoru_{soru_id}",
+                    varsayilan=date.today(), min_yil=1930, max_yil=date.today().year + 1,
+                )
             elif tip == "Seçenekli":
                 secenekler = [s.strip() for s in soru.get("secenekler", "").split(",") if s.strip()]
                 ek_cevaplar[soru_id] = st.selectbox(
@@ -523,6 +561,18 @@ if st.session_state.view == "form":
             eksikler.append("Babasının Mesleği")
         if not anne_meslek:
             eksikler.append("Annenin Mesleği")
+        if baba_gelir is None:
+            eksikler.append("Babanın Aylık Gelir Durumu")
+        if anne_gelir is None:
+            eksikler.append("Annenin Aylık Gelir Durumu")
+
+        for tarih_deger, ad in [
+            (dogum_tarihi, "Öğrenci Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
+            (baba_dogum_tarihi, "Baba Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
+            (anne_dogum_tarihi, "Anne Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
+        ]:
+            if tarih_deger is None:
+                eksikler.append(ad)
 
         for soru in aktif_sorular:
             cevap = ek_cevaplar.get(soru["id"])
@@ -530,6 +580,8 @@ if st.session_state.view == "form":
                 eksikler.append(soru["soru"])
             elif soru.get("tip") == "Seçenekli" and not cevap:
                 eksikler.append(soru["soru"])
+            elif soru.get("tip") == "Tarih" and cevap is None:
+                eksikler.append(soru["soru"] + " (geçersiz gün/ay kombinasyonu)")
 
         if len(tc_no.strip()) != 11 or not tc_no.strip().isdigit():
             eksikler.append("T.C. Kimlik No (11 haneli olmalı)")
