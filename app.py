@@ -192,6 +192,7 @@ def _logo_base64():
 
 
 def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key: str = "ust_serit_btn") -> bool:
+    logo_b64 = _logo_base64()
     st.markdown(
         """
         <style>
@@ -203,8 +204,14 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
         unsafe_allow_html=True,
     )
     tiklandi = False
+    # NOT: Sol ve sağ kenar kolonları BİLEREK eşit toplam genişlikte (3 birim) tutulur.
+    # Bu sayede logo kolonu, içeriğin uzunluğundan bağımsız olarak matematiksel
+    # olarak tam ortada kalır (position:absolute yerine simetrik kolon genişliği kullanıldı,
+    # çünkü absolute konumlandırma bazı Streamlit sürümlerinde şeridin dışına taşabiliyor).
     with st.container(key="ust_serit_kutu"):
-        col_baslik, col_logo, col_buton = st.columns([3, 2, 1.6], vertical_alignment="center")
+        col_baslik, col_logo, col_bosluk, col_buton = st.columns(
+            [3, 1.4, 1.4, 1.6], vertical_alignment="center"
+        )
         with col_baslik:
             st.markdown(
                 f"<p style='color:#FFFFFF; font-size:24px; font-weight:600; margin:0;'>{baslik}</p>"
@@ -212,10 +219,14 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                 unsafe_allow_html=True,
             )
         with col_logo:
-            try:
-                st.image("logo.png", width=110)
-            except Exception:
-                pass
+            if logo_b64:
+                st.markdown(
+                    f'<div style="display:flex; justify-content:center; align-items:center;">'
+                    f'<img src="data:image/png;base64,{logo_b64}" '
+                    f'style="height:72px; width:72px; border-radius:50%; background:#FFFFFF; '
+                    f'padding:4px; object-fit:cover; display:block;" /></div>',
+                    unsafe_allow_html=True,
+                )
         with col_buton:
             if buton_metni:
                 tiklandi = st.button(buton_metni, key=buton_key, use_container_width=True)
@@ -343,6 +354,7 @@ if st.session_state.view == "form":
     dogum_tarihi = st.date_input(
         "Öğrenci Doğum Tarihi *", value=date(2004, 1, 1),
         min_value=date(1980, 1, 1), max_value=date.today(),
+        format="DD/MM/YYYY",
     )
 
     st.markdown("**Öğrenci Doğum Yeri**")
@@ -393,6 +405,7 @@ if st.session_state.view == "form":
         baba_dogum_tarihi = st.date_input(
             "Baba Doğum Tarihi *", value=date(1975, 1, 1),
             min_value=date(1930, 1, 1), max_value=date.today(),
+            format="DD/MM/YYYY",
         )
         baba_gelir = st.number_input("Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500)
     st.markdown("Baba Doğum Yeri")
@@ -411,6 +424,7 @@ if st.session_state.view == "form":
         anne_dogum_tarihi = st.date_input(
             "Anne Doğum Tarihi *", value=date(1978, 1, 1),
             min_value=date(1930, 1, 1), max_value=date.today(),
+            format="DD/MM/YYYY",
         )
         anne_gelir = st.number_input("Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500)
     st.markdown("Anne Doğum Yeri")
@@ -452,7 +466,7 @@ if st.session_state.view == "form":
             elif tip == "Sayı":
                 ek_cevaplar[soru_id] = st.number_input(soru_metni, step=1, key=f"eksoru_{soru_id}")
             elif tip == "Tarih":
-                ek_cevaplar[soru_id] = st.date_input(soru_metni, key=f"eksoru_{soru_id}")
+                ek_cevaplar[soru_id] = st.date_input(soru_metni, key=f"eksoru_{soru_id}", format="DD/MM/YYYY")
             elif tip == "Seçenekli":
                 secenekler = [s.strip() for s in soru.get("secenekler", "").split(",") if s.strip()]
                 ek_cevaplar[soru_id] = st.selectbox(
@@ -732,6 +746,14 @@ else:
             for col in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)", "Okumakta Olan Kardeş Sayısı"]:
                 if col in df_tum.columns:
                     df_tum[col] = pd.to_numeric(df_tum[col], errors="coerce")
+            if "Zaman Damgası" in df_tum.columns:
+                df_tum["Zaman Damgası"] = pd.to_datetime(
+                    df_tum["Zaman Damgası"], errors="coerce"
+                ).dt.strftime("%d/%m/%Y %H:%M").fillna(df_tum["Zaman Damgası"])
+            for tarih_kolonu in ["Öğrenci Doğum Tarihi", "Baba Doğum Tarihi", "Anne Doğum Tarihi"]:
+                if tarih_kolonu in df_tum.columns:
+                    donusmus = pd.to_datetime(df_tum[tarih_kolonu], errors="coerce").dt.strftime("%d/%m/%Y")
+                    df_tum[tarih_kolonu] = donusmus.fillna(df_tum[tarih_kolonu])
 
             if "Dönem" in df_tum.columns:
                 donemler = ["Tümü"] + sorted(df_tum["Dönem"].dropna().unique().tolist(), reverse=True)
