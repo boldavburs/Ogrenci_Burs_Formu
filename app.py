@@ -318,7 +318,7 @@ if st.session_state.view == "form":
     aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
 
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
-    if _ust_serit("Öğrenci Bilgi ve Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
+    if _ust_serit("Bol-Dav Öğrenci Burs, Bilgi ve Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
         st.session_state.view = "admin"
         st.rerun()
 
