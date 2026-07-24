@@ -67,12 +67,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with open("data/il_ilce.json", "r", encoding="utf-8") as f:
-    IL_ILCE = json.load(f)
+@st.cache_data(show_spinner=False)
+def _il_ilce_yukle():
+    with open("data/il_ilce.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
+def _universiteler_yukle():
+    with open("data/universiteler.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+IL_ILCE = _il_ilce_yukle()
 IL_LISTESI = list(IL_ILCE.keys())
 
-with open("data/universiteler.json", "r", encoding="utf-8") as f:
-    UNIVERSITE_LISTESI = json.load(f)
+UNIVERSITE_LISTESI = _universiteler_yukle()
 UNIVERSITE_LISTESI_ARAMA = UNIVERSITE_LISTESI + ["Listede Yok / Diğer"]
 
 
@@ -244,6 +254,100 @@ def _meslek_secimi(label: str, prefix: str):
     if meslek == "Diğer":
         meslek_diger = st.text_input("Mesleği yazın", key=f"{prefix}_meslek_diger")
     return meslek_diger.strip() if meslek == "Diğer" else meslek
+
+
+@st.cache_data(show_spinner=False)
+def _grafikleri_olustur(df: pd.DataFrame, donem_sayilari_df=None):
+    """Tüm Genel Bakış grafiklerini bir kez hesaplayıp önbelleğe alır.
+    Veri değişmediği sürece (15 sn önbellek süresi içinde) tekrar tıklamalarda
+    Plotly grafikleri sıfırdan yeniden hesaplanmaz — panelin kasmasının ana
+    sebeplerinden biri buydu."""
+    grafikler = {}
+
+    if "Cinsiyet" in df.columns:
+        fig = px.pie(df, names="Cinsiyet", title="Cinsiyet Dağılımı", hole=0.5,
+                     color_discrete_sequence=["#F5821F", "#2C2C2A"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0))
+        grafikler["cinsiyet"] = fig
+
+    if "Sınıfı" in df.columns:
+        fig = px.bar(df["Sınıfı"].value_counts().reset_index(), x="Sınıfı", y="count",
+                     title="Sınıf Dağılımı", color_discrete_sequence=["#F5821F"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
+        grafikler["sinif"] = fig
+
+    if "Bölüm" in df.columns:
+        top_bolum = df["Bölüm"].value_counts().nlargest(10).reset_index()
+        fig = px.bar(top_bolum, x="count", y="Bölüm", orientation="h",
+                     title="En Çok Başvurulan 10 Bölüm", color_discrete_sequence=["#F5821F"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                           yaxis=dict(autorange="reversed"))
+        grafikler["bolum"] = fig
+
+    if "İkamet İl" in df.columns:
+        top_il = df["İkamet İl"].value_counts().nlargest(10).reset_index()
+        fig = px.bar(top_il, x="count", y="İkamet İl", orientation="h",
+                     title="En Çok Başvuru Yapılan 10 İl", color_discrete_sequence=["#2C2C2A"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                           yaxis=dict(autorange="reversed"))
+        grafikler["il"] = fig
+
+    if "Ebeveyn Medeni Durumu" in df.columns:
+        fig = px.bar(df["Ebeveyn Medeni Durumu"].value_counts().reset_index(),
+                     x="Ebeveyn Medeni Durumu", y="count", title="Ebeveyn Medeni Durumu Dağılımı",
+                     color_discrete_sequence=["#F5821F"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
+        grafikler["medeni_durum"] = fig
+
+    if "Babasının Mesleği" in df.columns:
+        fig = px.bar(df["Babasının Mesleği"].value_counts().nlargest(8).reset_index(),
+                     x="count", y="Babasının Mesleği", orientation="h",
+                     title="Babasının Mesleği Dağılımı", color_discrete_sequence=["#2C2C2A"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
+                           yaxis=dict(autorange="reversed"))
+        grafikler["meslek"] = fig
+
+    gerekli_kolonlar = {"Cinsiyet", "Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)",
+                        "Okumakta Olan Kardeş Sayısı"}
+    if gerekli_kolonlar.issubset(df.columns) and df["Cinsiyet"].nunique() > 0:
+        eksenler = ["Ort. Baba Geliri", "Ort. Anne Geliri", "Ort. Kardeş Sayısı", "Başvuru Oranı (%)"]
+        fig = go.Figure()
+        renkler = {"Kadın": "#F5821F", "Erkek": "#2C2C2A"}
+        for cinsiyet_grubu, renk in renkler.items():
+            alt_df = df[df["Cinsiyet"] == cinsiyet_grubu]
+            if alt_df.empty:
+                continue
+            degerler = [
+                alt_df["Babanın Aylık Geliri (TL)"].fillna(0).mean(),
+                alt_df["Annenin Aylık Geliri (TL)"].fillna(0).mean(),
+                alt_df["Okumakta Olan Kardeş Sayısı"].fillna(0).mean() * 5000,
+                (len(alt_df) / len(df)) * 100 * 200,
+            ]
+            fig.add_trace(go.Scatterpolar(
+                r=degerler, theta=eksenler, fill="toself", name=cinsiyet_grubu, line_color=renk,
+            ))
+        fig.update_layout(
+            title="Cinsiyete Göre Profil Karşılaştırması (Örümcek Grafik)",
+            polar=dict(radialaxis=dict(visible=False)),
+            margin=dict(t=40, b=0, l=40, r=40), showlegend=True,
+        )
+        grafikler["radar"] = fig
+
+    if "Babanın Aylık Geliri (TL)" in df.columns and "Annenin Aylık Geliri (TL)" in df.columns:
+        toplam_gelir = df["Babanın Aylık Geliri (TL)"].fillna(0) + df["Annenin Aylık Geliri (TL)"].fillna(0)
+        fig = px.histogram(toplam_gelir, nbins=15, title="Aile Toplam Gelir Dağılımı",
+                           color_discrete_sequence=["#F5821F"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="Toplam Gelir (TL)",
+                           yaxis_title="Başvuru Sayısı", showlegend=False)
+        grafikler["gelir_histogram"] = fig
+
+    if donem_sayilari_df is not None and len(donem_sayilari_df) > 1:
+        fig = px.bar(donem_sayilari_df, x="Dönem", y="count", title="Dönemlere Göre Toplam Başvuru Sayısı",
+                     color_discrete_sequence=["#F5821F"])
+        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
+        grafikler["donem_karsilastirma"] = fig
+
+    return grafikler
 
 
 def _turkce_tarih_secimi(label: str, prefix: str, varsayilan: date, min_yil: int, max_yil: int):
@@ -1038,105 +1142,52 @@ else:
                     if st.button("🔽 Analizleri Gizle", use_container_width=True):
                         st.session_state.analiz_goster = False
                         st.rerun()
+
+                    donem_sayilari_df = None
+                    if "Dönem" in df_tum.columns and df_tum["Dönem"].nunique() > 1:
+                        donem_sayilari_df = df_tum["Dönem"].value_counts().reset_index()
+
+                    grafikler = _grafikleri_olustur(df, donem_sayilari_df)
+
                     g1, g2 = st.columns(2)
                     with g1:
-                        if "Cinsiyet" in df.columns:
-                            fig = px.pie(df, names="Cinsiyet", title="Cinsiyet Dağılımı", hole=0.5,
-                                         color_discrete_sequence=["#F5821F", "#2C2C2A"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0))
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "cinsiyet" in grafikler:
+                            st.plotly_chart(grafikler["cinsiyet"], use_container_width=True)
                     with g2:
-                        if "Sınıfı" in df.columns:
-                            fig = px.bar(df["Sınıfı"].value_counts().reset_index(), x="Sınıfı", y="count",
-                                         title="Sınıf Dağılımı", color_discrete_sequence=["#F5821F"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "sinif" in grafikler:
+                            st.plotly_chart(grafikler["sinif"], use_container_width=True)
 
                     g3, g4 = st.columns(2)
                     with g3:
-                        if "Bölüm" in df.columns:
-                            top_bolum = df["Bölüm"].value_counts().nlargest(10).reset_index()
-                            fig = px.bar(top_bolum, x="count", y="Bölüm", orientation="h",
-                                         title="En Çok Başvurulan 10 Bölüm", color_discrete_sequence=["#F5821F"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
-                                               yaxis=dict(autorange="reversed"))
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "bolum" in grafikler:
+                            st.plotly_chart(grafikler["bolum"], use_container_width=True)
                     with g4:
-                        if "İkamet İl" in df.columns:
-                            top_il = df["İkamet İl"].value_counts().nlargest(10).reset_index()
-                            fig = px.bar(top_il, x="count", y="İkamet İl", orientation="h",
-                                         title="En Çok Başvuru Yapılan 10 İl", color_discrete_sequence=["#2C2C2A"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
-                                               yaxis=dict(autorange="reversed"))
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "il" in grafikler:
+                            st.plotly_chart(grafikler["il"], use_container_width=True)
 
                     g5, g6 = st.columns(2)
                     with g5:
-                        if "Ebeveyn Medeni Durumu" in df.columns:
-                            fig = px.bar(df["Ebeveyn Medeni Durumu"].value_counts().reset_index(),
-                                         x="Ebeveyn Medeni Durumu", y="count", title="Ebeveyn Medeni Durumu Dağılımı",
-                                         color_discrete_sequence=["#F5821F"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "medeni_durum" in grafikler:
+                            st.plotly_chart(grafikler["medeni_durum"], use_container_width=True)
                     with g6:
-                        if "Babasının Mesleği" in df.columns:
-                            fig = px.bar(df["Babasının Mesleği"].value_counts().nlargest(8).reset_index(),
-                                         x="count", y="Babasının Mesleği", orientation="h",
-                                         title="Babasının Mesleği Dağılımı", color_discrete_sequence=["#2C2C2A"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="",
-                                               yaxis=dict(autorange="reversed"))
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "meslek" in grafikler:
+                            st.plotly_chart(grafikler["meslek"], use_container_width=True)
 
                     g7, g8 = st.columns(2)
                     with g7:
-                        # Örümcek (radar) grafik: Erkek vs Kadın profil karşılaştırması
-                        gerekli_kolonlar = {"Cinsiyet", "Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)",
-                                            "Okumakta Olan Kardeş Sayısı"}
-                        if gerekli_kolonlar.issubset(df.columns) and df["Cinsiyet"].nunique() > 0:
-                            eksenler = ["Ort. Baba Geliri", "Ort. Anne Geliri", "Ort. Kardeş Sayısı", "Başvuru Oranı (%)"]
-                            fig = go.Figure()
-                            renkler = {"Kadın": "#F5821F", "Erkek": "#2C2C2A"}
-                            for cinsiyet_grubu, renk in renkler.items():
-                                alt_df = df[df["Cinsiyet"] == cinsiyet_grubu]
-                                if alt_df.empty:
-                                    continue
-                                degerler = [
-                                    alt_df["Babanın Aylık Geliri (TL)"].fillna(0).mean(),
-                                    alt_df["Annenin Aylık Geliri (TL)"].fillna(0).mean(),
-                                    alt_df["Okumakta Olan Kardeş Sayısı"].fillna(0).mean() * 5000,  # ölçek eşitleme
-                                    (len(alt_df) / len(df)) * 100 * 200,  # ölçek eşitleme
-                                ]
-                                fig.add_trace(go.Scatterpolar(
-                                    r=degerler, theta=eksenler, fill="toself", name=cinsiyet_grubu,
-                                    line_color=renk,
-                                ))
-                            fig.update_layout(
-                                title="Cinsiyete Göre Profil Karşılaştırması (Örümcek Grafik)",
-                                polar=dict(radialaxis=dict(visible=False)),
-                                margin=dict(t=40, b=0, l=40, r=40), showlegend=True,
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "radar" in grafikler:
+                            st.plotly_chart(grafikler["radar"], use_container_width=True)
                             st.caption(
                                 "Not: Eksenler farklı birimlerdeki değerleri (TL, kişi sayısı, %) "
                                 "karşılaştırılabilir kılmak için ölçeklendirilmiştir; mutlak değerler için "
                                 "Başvuru Listesi sekmesindeki tabloya bakın."
                             )
                     with g8:
-                        if "Babanın Aylık Geliri (TL)" in df.columns and "Annenin Aylık Geliri (TL)" in df.columns:
-                            toplam_gelir = (df["Babanın Aylık Geliri (TL)"].fillna(0)
-                                            + df["Annenin Aylık Geliri (TL)"].fillna(0))
-                            fig = px.histogram(toplam_gelir, nbins=15, title="Aile Toplam Gelir Dağılımı",
-                                               color_discrete_sequence=["#F5821F"])
-                            fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="Toplam Gelir (TL)",
-                                               yaxis_title="Başvuru Sayısı", showlegend=False)
-                            st.plotly_chart(fig, use_container_width=True)
+                        if "gelir_histogram" in grafikler:
+                            st.plotly_chart(grafikler["gelir_histogram"], use_container_width=True)
 
-                    if "Dönem" in df_tum.columns and df_tum["Dönem"].nunique() > 1:
-                        donem_sayilari = df_tum["Dönem"].value_counts().reset_index()
-                        fig = px.bar(donem_sayilari, x="Dönem", y="count", title="Dönemlere Göre Toplam Başvuru Sayısı",
-                                     color_discrete_sequence=["#F5821F"])
-                        fig.update_layout(margin=dict(t=40, b=0, l=0, r=0), xaxis_title="", yaxis_title="")
-                        st.plotly_chart(fig, use_container_width=True)
+                    if "donem_karsilastirma" in grafikler:
+                        st.plotly_chart(grafikler["donem_karsilastirma"], use_container_width=True)
 
             # -------------------- BAŞVURU LİSTESİ (İncelendi işaretleme) --------------------
             with tab_liste:
