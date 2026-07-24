@@ -42,7 +42,7 @@ except Exception:
 # Sadece bu 2 değeri değiştirerek TÜM metin kutusu, seçim kutusu (selectbox/
 # selectbox içindeki "İl seçiniz" gibi yer tutucu yazılar dahil) ve tarih
 # seçim kutularının arka plan / yazı rengini tek yerden kontrol edebilirsiniz.
-GIRIS_ALANI_ARKA_PLAN_RENGI = "#c9c7c7"  # kutuların arka plan rengi
+GIRIS_ALANI_ARKA_PLAN_RENGI = "#FFFFFF"  # kutuların arka plan rengi
 GIRIS_ALANI_YAZI_RENGI = "#000000"       # kutu içindeki yazı ve yer tutucu rengi (normal siyah)
 
 st.markdown(
@@ -858,7 +858,7 @@ else:
                 m3.metric("Bekleyen", len(df) - incelenen)
                 if "Babanın Aylık Geliri (TL)" in df.columns and "Annenin Aylık Geliri (TL)" in df.columns:
                     ort_gelir = (df["Babanın Aylık Geliri (TL)"].fillna(0) + df["Annenin Aylık Geliri (TL)"].fillna(0)).mean()
-                    m4.metric("Ort. Aile Geliri (TL)", f"{ort_gelir:,.0f}")
+                    m4.metric("Ort. Aile Geliri (TL)", f"{ort_gelir:,.0f}".replace(",", "."))
 
                 g1, g2 = st.columns(2)
                 with g1:
