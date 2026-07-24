@@ -24,7 +24,7 @@ REQUIRED_DOCUMENTS = [
     {"key": "lise_diploma_belgesi", "label": "Lise Öğrenci Diploma Belgesi ve Notu", "tur": ["pdf"]},
     {"key": "yks_yerlesme_belgesi", "label": "YKS Yerleşme Belgesi", "tur": ["pdf"]},
     {"key": "universite_kayit_belgesi", "label": "Üniversite Kayıt Öğrenci Belgesi", "tur": ["pdf"]},
-    {"key": "transkript", "label": "Transkript (ara sınıflar için)", "tur": ["pdf"]},
+    {"key": "transkript", "label": "Transkript (ara sınıflar için)", "tur": ["pdf"], "zorunlu": False},
     {"key": "banka_iban", "label": "Öğrenci Banka ve İban Numarası", "tur": ["pdf"]},
     {"key": "vesikalik_fotograf", "label": "1 Adet Vesikalık Fotoğraf", "tur": ["jpg", "jpeg", "png"]},
 ]
@@ -702,8 +702,10 @@ if st.session_state.view == "form":
             kolonlar = st.columns(SUTUN_SAYISI)
             for kolon, doc in zip(kolonlar, satir_belgeleri):
                 with kolon:
+                    zorunlu_mu = doc.get("zorunlu", True)
+                    etiket = f"{doc['label']} *" if zorunlu_mu else doc["label"]
                     uploaded[doc["key"]] = st.file_uploader(
-                        f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        etiket, type=doc.get("tur", ["pdf"]), key=doc["key"]
                     )
 
     if kisa_form_mu:
@@ -818,7 +820,7 @@ if st.session_state.view == "form":
             eksikler.append("T.C. Kimlik No (11 haneli olmalı)")
         if kisa_form_mu:
             for doc in REQUIRED_DOCUMENTS:
-                if uploaded.get(doc["key"]) is None:
+                if doc.get("zorunlu", True) and uploaded.get(doc["key"]) is None:
                     eksikler.append(doc["label"])
         if not onay:
             if kisa_form_mu:
@@ -869,7 +871,11 @@ if st.session_state.view == "form":
                 "timestamp": datetime.now().isoformat(),
                 "fields": temel_alanlar,
                 "files": (
-                    {doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS}
+                    {
+                        doc["key"]: _file_to_b64(uploaded[doc["key"]])
+                        for doc in REQUIRED_DOCUMENTS
+                        if uploaded.get(doc["key"]) is not None
+                    }
                     if kisa_form_mu else {}
                 ),
                 "folder_name": f"{ad_soyad.strip()}_{tc_no.strip()}",
