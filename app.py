@@ -311,7 +311,7 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                     f'<div style="text-align:center;">'
                     f'<img src="data:image/png;base64,{logo_b64}" '
                     f'style="height:100px; width:100px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:4px; object-fit:cover; display:inline-block; vertical-align:middle;" /></div>',
+                    f'padding:8px; object-fit:cover; display:inline-block; vertical-align:middle;" /></div>',
                     unsafe_allow_html=True,
                 )
         with col_buton:
