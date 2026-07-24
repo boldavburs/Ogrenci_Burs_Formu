@@ -1236,63 +1236,97 @@ else:
                     else:
                         st.info("Değişiklik bulunamadı.")
 
-                buffer = BytesIO()
-                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                    veri_df = df[display_cols].copy()
-                    veri_df.to_excel(writer, index=False, sheet_name="Basvurular")
+                st.markdown("#### 📥 Dışa Aktar")
+                st.caption("Görüntülediğiniz listeden bağımsız olarak, indirmek istediğiniz veriyi burada seçin.")
+                dl_col1, dl_col2 = st.columns(2)
+                with dl_col1:
+                    if "Dönem" in df_tum.columns:
+                        dl_donemler = ["Tümü"] + sorted(df_tum["Dönem"].dropna().unique().tolist(), reverse=True)
+                    else:
+                        dl_donemler = ["Tümü"]
+                    indirilecek_donem = st.selectbox("İndirilecek Dönem", dl_donemler, key="indir_donem")
+                with dl_col2:
+                    if "Form Tipi" in df_tum.columns:
+                        dl_form_tipleri = ["Tümü"] + sorted(df_tum["Form Tipi"].dropna().unique().tolist())
+                    else:
+                        dl_form_tipleri = ["Tümü"]
+                    indirilecek_form_tipi = st.selectbox("İndirilecek Form Tipi", dl_form_tipleri, key="indir_form_tipi")
 
-                    # -------- Özet Pivot sayfası (statik, hazır özet tablolar) --------
-                    ozet_sheet_yazildi = False
-                    if "Dönem" in veri_df.columns and "Cinsiyet" in veri_df.columns:
-                        pivot1 = pd.pivot_table(
-                            veri_df, index="Dönem", columns="Cinsiyet",
-                            values="T.C. Kimlik No", aggfunc="count", fill_value=0,
-                        )
-                        pivot1.to_excel(writer, sheet_name="Özet Pivot", startrow=1)
-                        ozet_sheet_yazildi = True
-                    if "Bölüm" in veri_df.columns:
-                        pivot2 = (
-                            veri_df["Bölüm"].value_counts().rename("Başvuru Sayısı").to_frame()
-                        )
-                        baslangic_satiri = len(pivot1) + 5 if ozet_sheet_yazildi else 1
-                        pivot2.to_excel(writer, sheet_name="Özet Pivot", startrow=baslangic_satiri)
-                        ozet_sheet_yazildi = True
+                if st.button("📊 Excel Oluştur", use_container_width=True):
+                    export_df = df_tum.copy()
+                    if indirilecek_donem != "Tümü" and "Dönem" in export_df.columns:
+                        export_df = export_df[export_df["Dönem"] == indirilecek_donem]
+                    if indirilecek_form_tipi != "Tümü" and "Form Tipi" in export_df.columns:
+                        export_df = export_df[export_df["Form Tipi"] == indirilecek_form_tipi]
+                        export_df = export_df.dropna(axis=1, how="all")
+                        export_df = export_df.loc[
+                            :, ~(export_df.astype(str).apply(lambda s: s.str.strip()) == "").all()
+                        ]
+                    export_display_cols = [c for c in export_df.columns if not c.startswith("Belge:")]
+                    veri_df = export_df[export_display_cols].copy()
 
-                    ws = writer.sheets["Basvurular"]
-                    from openpyxl.worksheet.table import Table, TableStyleInfo
-                    from openpyxl.utils import get_column_letter
+                    buffer = BytesIO()
+                    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                        veri_df.to_excel(writer, index=False, sheet_name="Basvurular")
 
-                    n_satir, n_sutun = veri_df.shape
-                    if n_satir > 0 and n_sutun > 0:
-                        son_hucre = f"{get_column_letter(n_sutun)}{n_satir + 1}"
-                        tablo = Table(displayName="BasvuruTablosu", ref=f"A1:{son_hucre}")
-                        tablo.tableStyleInfo = TableStyleInfo(
-                            name="TableStyleMedium9", showRowStripes=True,
-                            showFirstColumn=False, showLastColumn=False,
-                        )
-                        ws.add_table(tablo)
+                        # -------- Özet Pivot sayfası (statik, hazır özet tablolar) --------
+                        ozet_sheet_yazildi = False
+                        if "Dönem" in veri_df.columns and "Cinsiyet" in veri_df.columns:
+                            pivot1 = pd.pivot_table(
+                                veri_df, index="Dönem", columns="Cinsiyet",
+                                values="T.C. Kimlik No", aggfunc="count", fill_value=0,
+                            )
+                            pivot1.to_excel(writer, sheet_name="Özet Pivot", startrow=1)
+                            ozet_sheet_yazildi = True
+                        if "Bölüm" in veri_df.columns:
+                            pivot2 = (
+                                veri_df["Bölüm"].value_counts().rename("Başvuru Sayısı").to_frame()
+                            )
+                            baslangic_satiri = len(pivot1) + 5 if ozet_sheet_yazildi else 1
+                            pivot2.to_excel(writer, sheet_name="Özet Pivot", startrow=baslangic_satiri)
 
-                        # Sütun genişliklerini kabaca içeriğe göre ayarla
-                        for i, kolon in enumerate(veri_df.columns, start=1):
-                            uzunluk = max(len(str(kolon)), veri_df[kolon].astype(str).str.len().max() if n_satir else 0)
-                            ws.column_dimensions[get_column_letter(i)].width = min(max(uzunluk + 2, 10), 40)
+                        ws = writer.sheets["Basvurular"]
+                        from openpyxl.worksheet.table import Table, TableStyleInfo
+                        from openpyxl.utils import get_column_letter
 
-                        # Gelir / sayısal sütunlara binlik ayraçlı format ver
-                        for kolon_adi in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)",
-                                          "Okumakta Olan Kardeş Sayısı"]:
-                            if kolon_adi in veri_df.columns:
-                                col_idx = veri_df.columns.get_loc(kolon_adi) + 1
-                                harf = get_column_letter(col_idx)
-                                for satir in range(2, n_satir + 2):
-                                    ws[f"{harf}{satir}"].number_format = "#,##0"
+                        n_satir, n_sutun = veri_df.shape
+                        if n_satir > 0 and n_sutun > 0:
+                            son_hucre = f"{get_column_letter(n_sutun)}{n_satir + 1}"
+                            tablo = Table(displayName="BasvuruTablosu", ref=f"A1:{son_hucre}")
+                            tablo.tableStyleInfo = TableStyleInfo(
+                                name="TableStyleMedium9", showRowStripes=True,
+                                showFirstColumn=False, showLastColumn=False,
+                            )
+                            ws.add_table(tablo)
 
-                st.download_button(
-                    "📥 Excel Olarak İndir (Tablo + Özet Pivot)",
-                    data=buffer.getvalue(),
-                    file_name=f"basvurular_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
+                            for i, kolon in enumerate(veri_df.columns, start=1):
+                                uzunluk = max(len(str(kolon)), veri_df[kolon].astype(str).str.len().max() if n_satir else 0)
+                                ws.column_dimensions[get_column_letter(i)].width = min(max(uzunluk + 2, 10), 40)
+
+                            for kolon_adi in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)",
+                                              "Okumakta Olan Kardeş Sayısı"]:
+                                if kolon_adi in veri_df.columns:
+                                    col_idx = veri_df.columns.get_loc(kolon_adi) + 1
+                                    harf = get_column_letter(col_idx)
+                                    for satir in range(2, n_satir + 2):
+                                        ws[f"{harf}{satir}"].number_format = "#,##0"
+
+                    st.session_state["excel_buffer"] = buffer.getvalue()
+                    guvenli_ad = f"{indirilecek_donem}_{indirilecek_form_tipi}".replace(" ", "_").replace("/", "-")
+                    st.session_state["excel_dosya_adi"] = (
+                        f"basvurular_{guvenli_ad}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                    )
+                    st.session_state["excel_satir_sayisi"] = n_satir
+
+                if st.session_state.get("excel_buffer"):
+                    st.caption(f"Hazır: {st.session_state.get('excel_satir_sayisi', 0)} kayıt içeren dosya indirilmeye hazır.")
+                    st.download_button(
+                        "📥 Excel'i İndir (Tablo + Özet Pivot)",
+                        data=st.session_state["excel_buffer"],
+                        file_name=st.session_state.get("excel_dosya_adi", "basvurular.xlsx"),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
                 st.caption(
                     "İndirilen dosyada 'Basvurular' sayfası filtrelenebilir bir Excel tablosu, "
                     "'Özet Pivot' sayfası ise dönem/cinsiyet/bölüm bazlı hazır özet tablolar içerir. "
