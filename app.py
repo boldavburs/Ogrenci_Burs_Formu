@@ -120,6 +120,30 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _fetch_form_tipi() -> dict:
+    """Hangi form tipinin (Tam Anket / Kısa Form) aktif olduğunu getirir (önbelleğe alınır)."""
+    url = st.secrets["APPS_SCRIPT_URL"]
+    resp = requests.get(
+        url,
+        params={"action": "get_form_tipi", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _update_form_tipi(form_tipi: str) -> bool:
+    payload = {
+        "action": "update_form_tipi",
+        "form_tipi": form_tipi,
+        "secret": st.secrets["APPS_SCRIPT_SECRET"],
+    }
+    resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("ok", False)
+
+
 def _fetch_donemler() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
     resp = requests.get(
@@ -403,6 +427,13 @@ if st.session_state.view == "form":
         st.warning("📌 Başvurular şu anda kapalıdır. Yeni dönem başvuruları açıldığında bu sayfadan duyurulacaktır.")
         st.stop()
 
+    try:
+        form_tipi_sonuc = _fetch_form_tipi()
+        form_tipi = form_tipi_sonuc.get("form_tipi", "Tam") if form_tipi_sonuc.get("ok") else "Tam"
+    except Exception:
+        form_tipi = "Tam"
+    kisa_form_mu = form_tipi == "Kisa"
+
     st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
 
     _bolum_basligi("1", "Öğrenci Bilgileri")
@@ -428,133 +459,149 @@ if st.session_state.view == "form":
     with n1:
         nufus_il, nufus_ilce = _il_ilce_secimi("İl *", "İlçe *", "nufus_kayit")
 
-    _bolum_basligi("2", "İkamet Bilgisi")
-    c3, c4 = st.columns(2)
-    with c3:
-        ikamet_il, ikamet_ilce = _il_ilce_secimi("İkamet Edilen İl *", "İkamet Edilen İlçe *", "ikamet")
-    with c4:
-        kaldigi_yer = st.selectbox(
-            "Öğrencinin Kaldığı Yer *",
-            ["Aile Yanında", "Yurtta", "Kirada / Arkadaşlarıyla", "Akraba Yanında", "Diğer"],
-        )
-
-    _bolum_basligi("3", "Eğitim Bilgileri")
-    c5, c6 = st.columns(2)
-    with c5:
-        universite = st.selectbox(
-            "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
-            placeholder="Üniversite adı yazarak arayın...",
-        )
-        universite_diger = ""
-        if universite == "Listede Yok / Diğer":
-            universite_diger = st.text_input("Üniversite adını yazın *")
-        bolum = st.text_input("Bölüm *")
-        okul_ili = st.selectbox("Okulun Bulunduğu İl *", IL_LISTESI, index=None, placeholder="İl seçiniz")
-    with c6:
-        fakulte = st.text_input("Fakülte *")
-        sinif = st.selectbox("Sınıfı *", ["Hazırlık", "1", "2", "3", "4", "5", "6", "Yüksek Lisans"])
-        lise_derece = st.text_input("Lise Mezuniyet Derecesi / Ortalaması *")
-    lise_adi = st.text_input("Mezun Olduğu Lise ve Dengi Okul *")
-
-    _bolum_basligi("4", "Aile Bilgileri")
-    st.markdown("**Baba**")
-    c7, c8 = st.columns(2)
-    with c7:
-        baba_adi = st.text_input("Baba Adı *")
-        baba_telefon = st.text_input("Baba Telefonu *")
-    with c8:
-        baba_meslek = _meslek_secimi("Babasının Mesleği *", "baba")
-        baba_gelir = st.number_input(
-            "Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500,
-            value=None, placeholder="Örn: 15000",
-        )
-    baba_dogum_tarihi = _turkce_tarih_secimi(
-        "Baba Doğum Tarihi *", "baba_dogum_tarihi",
-        varsayilan=date(1975, 1, 1), min_yil=1930, max_yil=date.today().year,
-    )
-    st.markdown("Baba Doğum Yeri")
-    bd1, bd2 = st.columns(2)
-    with bd1:
-        baba_dogum_il, baba_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "baba_dogum")
-    baba_adres = st.text_area("Baba Adresi *")
-
-    st.markdown("**Anne**")
-    c9, c10 = st.columns(2)
-    with c9:
-        anne_adi = st.text_input("Anne Adı *")
-        anne_telefon = st.text_input("Anne Telefonu *")
-    with c10:
-        anne_meslek = _meslek_secimi("Annenin Mesleği *", "anne")
-        anne_gelir = st.number_input(
-            "Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500,
-            value=None, placeholder="Örn: 10000",
-        )
-    anne_dogum_tarihi = _turkce_tarih_secimi(
-        "Anne Doğum Tarihi *", "anne_dogum_tarihi",
-        varsayilan=date(1978, 1, 1), min_yil=1930, max_yil=date.today().year,
-    )
-    st.markdown("Anne Doğum Yeri")
-    ad1, ad2 = st.columns(2)
-    with ad1:
-        anne_dogum_il, anne_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "anne_dogum")
-    anne_adres = st.text_area("Anne Adresi *")
-
-    ebeveyn_durumu = st.selectbox(
-        "Ebeveyn Medeni Durumu *",
-        ["Evli", "Boşanmış", "Baba Vefat", "Anne Vefat", "Her İkisi Vefat"],
-    )
-
-    _bolum_basligi("5", "Sosyoekonomik Bilgiler")
-    kardes_sayisi = st.number_input("Okumakta Olan Kardeş Sayısı *", min_value=0, max_value=15, step=1)
-    kardes_okullari = st.text_area(
-        "Kardeşlerin Okuduğu Okullar *",
-        placeholder="Okuyan kardeşiniz yoksa 'Yok' yazınız",
-    )
-    sosyo_ekonomik = st.text_area(
-        "Sosyo Ekonomik Faktörler *",
-        placeholder="Aile durumunu etkileyen ek faktörler (engellilik, kronik hastalık, kira yükü vb.)",
-    )
-
-    try:
-        aktif_sorular = _fetch_sorular_aktif().get("sorular", [])
-    except Exception:
-        aktif_sorular = []
-
+    # -------- Aşağıdaki bölümler SADECE "Tam Anket" form tipinde gösterilir --------
+    ikamet_il = ikamet_ilce = kaldigi_yer = None
+    universite = universite_diger = bolum = okul_ili = None
+    fakulte = sinif = lise_derece = lise_adi = None
+    baba_adi = baba_telefon = baba_meslek = baba_adres = None
+    baba_gelir = baba_dogum_tarihi = baba_dogum_il = baba_dogum_ilce = None
+    anne_adi = anne_telefon = anne_meslek = anne_adres = None
+    anne_gelir = anne_dogum_tarihi = anne_dogum_il = anne_dogum_ilce = None
+    ebeveyn_durumu = None
+    kardes_sayisi = kardes_okullari = sosyo_ekonomik = None
+    aktif_sorular = []
     ek_cevaplar = {}
-    if aktif_sorular:
-        _bolum_basligi("6", "Ek Sorular")
-        for soru in aktif_sorular:
-            soru_id = soru["id"]
-            soru_metni = soru["soru"] + " *"
-            tip = soru.get("tip", "Kısa Metin")
-            if tip == "Uzun Metin":
-                ek_cevaplar[soru_id] = st.text_area(soru_metni, key=f"eksoru_{soru_id}")
-            elif tip == "Sayı":
-                ek_cevaplar[soru_id] = st.number_input(soru_metni, step=1, key=f"eksoru_{soru_id}")
-            elif tip == "Tarih":
-                ek_cevaplar[soru_id] = _turkce_tarih_secimi(
-                    soru_metni, f"eksoru_{soru_id}",
-                    varsayilan=date.today(), min_yil=1930, max_yil=date.today().year + 1,
-                )
-            elif tip == "Seçenekli":
-                secenekler = [s.strip() for s in soru.get("secenekler", "").split(",") if s.strip()]
-                ek_cevaplar[soru_id] = st.selectbox(
-                    soru_metni, secenekler, index=None, placeholder="Seçiniz", key=f"eksoru_{soru_id}"
-                )
-            elif tip == "Evet/Hayır":
-                ek_cevaplar[soru_id] = st.radio(soru_metni, ["Evet", "Hayır"], horizontal=True, key=f"eksoru_{soru_id}")
-            else:  # Kısa Metin
-                ek_cevaplar[soru_id] = st.text_input(soru_metni, key=f"eksoru_{soru_id}")
 
-    _bolum_basligi("7", "Belgeler")
-    st.caption("Kabul edilen dosya türleri: PDF, JPG, PNG — dosya başına en fazla 10 MB.")
-    uploaded = {}
-    for doc in REQUIRED_DOCUMENTS:
-        uploaded[doc["key"]] = st.file_uploader(
-            f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
+    if not kisa_form_mu:
+        _bolum_basligi("2", "İkamet Bilgisi")
+        c3, c4 = st.columns(2)
+        with c3:
+            ikamet_il, ikamet_ilce = _il_ilce_secimi("İkamet Edilen İl *", "İkamet Edilen İlçe *", "ikamet")
+        with c4:
+            kaldigi_yer = st.selectbox(
+                "Öğrencinin Kaldığı Yer *",
+                ["Aile Yanında", "Yurtta", "Kirada / Arkadaşlarıyla", "Akraba Yanında", "Diğer"],
+            )
+
+        _bolum_basligi("3", "Eğitim Bilgileri")
+        c5, c6 = st.columns(2)
+        with c5:
+            universite = st.selectbox(
+                "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
+                placeholder="Üniversite adı yazarak arayın...",
+            )
+            universite_diger = ""
+            if universite == "Listede Yok / Diğer":
+                universite_diger = st.text_input("Üniversite adını yazın *")
+            bolum = st.text_input("Bölüm *")
+            okul_ili = st.selectbox("Okulun Bulunduğu İl *", IL_LISTESI, index=None, placeholder="İl seçiniz")
+        with c6:
+            fakulte = st.text_input("Fakülte *")
+            sinif = st.selectbox("Sınıfı *", ["Hazırlık", "1", "2", "3", "4", "5", "6", "Yüksek Lisans"])
+            lise_derece = st.text_input("Lise Mezuniyet Derecesi / Ortalaması *")
+        lise_adi = st.text_input("Mezun Olduğu Lise ve Dengi Okul *")
+
+        _bolum_basligi("4", "Aile Bilgileri")
+        st.markdown("**Baba**")
+        c7, c8 = st.columns(2)
+        with c7:
+            baba_adi = st.text_input("Baba Adı *")
+            baba_telefon = st.text_input("Baba Telefonu *")
+        with c8:
+            baba_meslek = _meslek_secimi("Babasının Mesleği *", "baba")
+            baba_gelir = st.number_input(
+                "Babanın Aylık Gelir Durumu (TL) *", min_value=0, step=500,
+                value=None, placeholder="Örn: 15000",
+            )
+        baba_dogum_tarihi = _turkce_tarih_secimi(
+            "Baba Doğum Tarihi *", "baba_dogum_tarihi",
+            varsayilan=date(1975, 1, 1), min_yil=1930, max_yil=date.today().year,
+        )
+        st.markdown("Baba Doğum Yeri")
+        bd1, bd2 = st.columns(2)
+        with bd1:
+            baba_dogum_il, baba_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "baba_dogum")
+        baba_adres = st.text_area("Baba Adresi *")
+
+        st.markdown("**Anne**")
+        c9, c10 = st.columns(2)
+        with c9:
+            anne_adi = st.text_input("Anne Adı *")
+            anne_telefon = st.text_input("Anne Telefonu *")
+        with c10:
+            anne_meslek = _meslek_secimi("Annenin Mesleği *", "anne")
+            anne_gelir = st.number_input(
+                "Annenin Aylık Gelir Durumu (TL) *", min_value=0, step=500,
+                value=None, placeholder="Örn: 10000",
+            )
+        anne_dogum_tarihi = _turkce_tarih_secimi(
+            "Anne Doğum Tarihi *", "anne_dogum_tarihi",
+            varsayilan=date(1978, 1, 1), min_yil=1930, max_yil=date.today().year,
+        )
+        st.markdown("Anne Doğum Yeri")
+        ad1, ad2 = st.columns(2)
+        with ad1:
+            anne_dogum_il, anne_dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "anne_dogum")
+        anne_adres = st.text_area("Anne Adresi *")
+
+        ebeveyn_durumu = st.selectbox(
+            "Ebeveyn Medeni Durumu *",
+            ["Evli", "Boşanmış", "Baba Vefat", "Anne Vefat", "Her İkisi Vefat"],
         )
 
-    _bolum_basligi("8", "Onay")
+        _bolum_basligi("5", "Sosyoekonomik Bilgiler")
+        kardes_sayisi = st.number_input("Okumakta Olan Kardeş Sayısı *", min_value=0, max_value=15, step=1)
+        kardes_okullari = st.text_area(
+            "Kardeşlerin Okuduğu Okullar *",
+            placeholder="Okuyan kardeşiniz yoksa 'Yok' yazınız",
+        )
+        sosyo_ekonomik = st.text_area(
+            "Sosyo Ekonomik Faktörler *",
+            placeholder="Aile durumunu etkileyen ek faktörler (engellilik, kronik hastalık, kira yükü vb.)",
+        )
+
+        try:
+            aktif_sorular = _fetch_sorular_aktif().get("sorular", [])
+        except Exception:
+            aktif_sorular = []
+
+        if aktif_sorular:
+            _bolum_basligi("6", "Ek Sorular")
+            for soru in aktif_sorular:
+                soru_id = soru["id"]
+                soru_metni = soru["soru"] + " *"
+                tip = soru.get("tip", "Kısa Metin")
+                if tip == "Uzun Metin":
+                    ek_cevaplar[soru_id] = st.text_area(soru_metni, key=f"eksoru_{soru_id}")
+                elif tip == "Sayı":
+                    ek_cevaplar[soru_id] = st.number_input(soru_metni, step=1, key=f"eksoru_{soru_id}")
+                elif tip == "Tarih":
+                    ek_cevaplar[soru_id] = _turkce_tarih_secimi(
+                        soru_metni, f"eksoru_{soru_id}",
+                        varsayilan=date.today(), min_yil=1930, max_yil=date.today().year + 1,
+                    )
+                elif tip == "Seçenekli":
+                    secenekler = [s.strip() for s in soru.get("secenekler", "").split(",") if s.strip()]
+                    ek_cevaplar[soru_id] = st.selectbox(
+                        soru_metni, secenekler, index=None, placeholder="Seçiniz", key=f"eksoru_{soru_id}"
+                    )
+                elif tip == "Evet/Hayır":
+                    ek_cevaplar[soru_id] = st.radio(soru_metni, ["Evet", "Hayır"], horizontal=True, key=f"eksoru_{soru_id}")
+                else:  # Kısa Metin
+                    ek_cevaplar[soru_id] = st.text_input(soru_metni, key=f"eksoru_{soru_id}")
+
+    # -------- Belgeler: SADECE "Kısa Form" tipinde gösterilir --------
+    uploaded = {}
+    if kisa_form_mu:
+        _bolum_basligi("2", "Belgeler")
+        st.caption("Kabul edilen dosya türleri: PDF, JPG, PNG — dosya başına en fazla 10 MB.")
+        for doc in REQUIRED_DOCUMENTS:
+            uploaded[doc["key"]] = st.file_uploader(
+                f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
+            )
+
+    onay_no = "3" if kisa_form_mu else "7"
+    _bolum_basligi(onay_no, "Onay")
     onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
 
     submitted = st.button("Başvuruyu Gönder", use_container_width=True, type="primary")
@@ -562,46 +609,58 @@ if st.session_state.view == "form":
     if submitted:
         zorunlu_metin_alanlari = {
             "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no, "E-Posta Adresi": email,
-            "Cep Telefon Numarası": telefon, "Fakülte": fakulte,
-            "Bölüm": bolum, "Mezun Olduğu Lise": lise_adi, "Lise Mezuniyet Derecesi": lise_derece,
-            "Baba Adı": baba_adi, "Baba Telefonu": baba_telefon, "Baba Adresi": baba_adres,
-            "Anne Adı": anne_adi, "Anne Telefonu": anne_telefon, "Anne Adresi": anne_adres,
-            "Sosyo Ekonomik Faktörler": sosyo_ekonomik, "Kardeşlerin Okuduğu Okullar": kardes_okullari,
+            "Cep Telefon Numarası": telefon,
         }
-        eksikler = [ad for ad, deger in zorunlu_metin_alanlari.items() if not deger.strip()]
+        if not kisa_form_mu:
+            zorunlu_metin_alanlari.update({
+                "Fakülte": fakulte, "Bölüm": bolum, "Mezun Olduğu Lise": lise_adi,
+                "Lise Mezuniyet Derecesi": lise_derece,
+                "Baba Adı": baba_adi, "Baba Telefonu": baba_telefon, "Baba Adresi": baba_adres,
+                "Anne Adı": anne_adi, "Anne Telefonu": anne_telefon, "Anne Adresi": anne_adres,
+                "Sosyo Ekonomik Faktörler": sosyo_ekonomik, "Kardeşlerin Okuduğu Okullar": kardes_okullari,
+            })
+        eksikler = [ad for ad, deger in zorunlu_metin_alanlari.items() if not (deger or "").strip()]
 
-        for il_deger, ilce_deger, ad in [
+        il_ilce_kontrol_listesi = [
             (dogum_il, dogum_ilce, "Öğrenci Doğum Yeri (İl/İlçe)"),
             (nufus_il, nufus_ilce, "Nüfusa Kayıtlı Olduğu Yer (İl/İlçe)"),
-            (ikamet_il, ikamet_ilce, "İkamet Edilen İl/İlçe"),
-            (baba_dogum_il, baba_dogum_ilce, "Baba Doğum Yeri (İl/İlçe)"),
-            (anne_dogum_il, anne_dogum_ilce, "Anne Doğum Yeri (İl/İlçe)"),
-        ]:
+        ]
+        if not kisa_form_mu:
+            il_ilce_kontrol_listesi += [
+                (ikamet_il, ikamet_ilce, "İkamet Edilen İl/İlçe"),
+                (baba_dogum_il, baba_dogum_ilce, "Baba Doğum Yeri (İl/İlçe)"),
+                (anne_dogum_il, anne_dogum_ilce, "Anne Doğum Yeri (İl/İlçe)"),
+            ]
+        for il_deger, ilce_deger, ad in il_ilce_kontrol_listesi:
             if not il_deger or not ilce_deger:
                 eksikler.append(ad)
 
-        if not okul_ili:
-            eksikler.append("Okulun Bulunduğu İl")
-        if not universite:
-            eksikler.append("Üniversite Adı")
-        elif universite == "Listede Yok / Diğer" and not universite_diger.strip():
-            eksikler.append("Üniversite Adı (listede yoksa elle yazılmalı)")
-        universite_final = universite_diger.strip() if universite == "Listede Yok / Diğer" else universite
+        universite_final = None
+        if not kisa_form_mu:
+            if not okul_ili:
+                eksikler.append("Okulun Bulunduğu İl")
+            if not universite:
+                eksikler.append("Üniversite Adı")
+            elif universite == "Listede Yok / Diğer" and not universite_diger.strip():
+                eksikler.append("Üniversite Adı (listede yoksa elle yazılmalı)")
+            universite_final = universite_diger.strip() if universite == "Listede Yok / Diğer" else universite
 
-        if not baba_meslek:
-            eksikler.append("Babasının Mesleği")
-        if not anne_meslek:
-            eksikler.append("Annenin Mesleği")
-        if baba_gelir is None:
-            eksikler.append("Babanın Aylık Gelir Durumu")
-        if anne_gelir is None:
-            eksikler.append("Annenin Aylık Gelir Durumu")
+            if not baba_meslek:
+                eksikler.append("Babasının Mesleği")
+            if not anne_meslek:
+                eksikler.append("Annenin Mesleği")
+            if baba_gelir is None:
+                eksikler.append("Babanın Aylık Gelir Durumu")
+            if anne_gelir is None:
+                eksikler.append("Annenin Aylık Gelir Durumu")
 
-        for tarih_deger, ad in [
-            (dogum_tarihi, "Öğrenci Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
-            (baba_dogum_tarihi, "Baba Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
-            (anne_dogum_tarihi, "Anne Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
-        ]:
+        tarih_kontrol_listesi = [(dogum_tarihi, "Öğrenci Doğum Tarihi (geçersiz gün/ay kombinasyonu)")]
+        if not kisa_form_mu:
+            tarih_kontrol_listesi += [
+                (baba_dogum_tarihi, "Baba Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
+                (anne_dogum_tarihi, "Anne Doğum Tarihi (geçersiz gün/ay kombinasyonu)"),
+            ]
+        for tarih_deger, ad in tarih_kontrol_listesi:
             if tarih_deger is None:
                 eksikler.append(ad)
 
@@ -616,24 +675,26 @@ if st.session_state.view == "form":
 
         if len(tc_no.strip()) != 11 or not tc_no.strip().isdigit():
             eksikler.append("T.C. Kimlik No (11 haneli olmalı)")
-        for doc in REQUIRED_DOCUMENTS:
-            if uploaded[doc["key"]] is None:
-                eksikler.append(doc["label"])
+        if kisa_form_mu:
+            for doc in REQUIRED_DOCUMENTS:
+                if uploaded.get(doc["key"]) is None:
+                    eksikler.append(doc["label"])
         if not onay:
             eksikler.append("Onay kutusu işaretlenmeli")
 
         if eksikler:
             st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
         else:
-            payload = {
-                "action": "submit",
-                "timestamp": datetime.now().isoformat(),
-                "fields": {
-                    "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
-                    "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
-                    "Öğrenci Doğum Tarihi": str(dogum_tarihi),
-                    "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
-                    "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
+            temel_alanlar = {
+                "Form Tipi": "Kısa Form" if kisa_form_mu else "Tam Anket",
+                "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
+                "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
+                "Öğrenci Doğum Tarihi": str(dogum_tarihi),
+                "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
+                "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
+            }
+            if not kisa_form_mu:
+                temel_alanlar.update({
                     "İkamet İl": ikamet_il, "İkamet İlçe": ikamet_ilce,
                     "Öğrencinin Kaldığı Yer": kaldigi_yer,
                     "Üniversite Adı": universite_final, "Fakülte": fakulte, "Bölüm": bolum, "Sınıfı": sinif,
@@ -657,10 +718,16 @@ if st.session_state.view == "form":
                         f"Ek Soru: {soru['soru']}": str(ek_cevaplar.get(soru["id"], ""))
                         for soru in aktif_sorular
                     },
-                },
-                "files": {
-                    doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS
-                },
+                })
+
+            payload = {
+                "action": "submit",
+                "timestamp": datetime.now().isoformat(),
+                "fields": temel_alanlar,
+                "files": (
+                    {doc["key"]: _file_to_b64(uploaded[doc["key"]]) for doc in REQUIRED_DOCUMENTS}
+                    if kisa_form_mu else {}
+                ),
                 "folder_name": f"{ad_soyad.strip()}_{tc_no.strip()}",
             }
             st.session_state["pending_payload"] = payload
@@ -674,6 +741,7 @@ if st.session_state.view == "form":
         st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
         st.balloons()
         st.session_state["submit_success"] = False
+
 
 # ============================================================================
 # YÖNETİCİ PANELİ
@@ -697,6 +765,38 @@ else:
     else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
+
+        with st.expander("🧾 Form Tipi (Hangi form öğrenciye gösterilsin?)", expanded=False):
+            st.caption(
+                "**Tam Anket:** Mevcut tüm sorular (öğrenci/aile/eğitim/sosyoekonomik bilgiler) gösterilir, "
+                "**belge yükleme yoktur**.\n\n"
+                "**Kısa Form:** Sadece 1. Öğrenci Bilgileri bölümü + belge yükleme gösterilir, "
+                "diğer tüm bölümler (ikamet, eğitim, aile, sosyoekonomik, ek sorular) formda görünmez."
+            )
+            try:
+                form_tipi_sonuc = _fetch_form_tipi()
+            except Exception as e:
+                form_tipi_sonuc = {"ok": False}
+                st.error(f"Form tipi alınamadı: {e}")
+
+            if form_tipi_sonuc.get("ok"):
+                mevcut_form_tipi = form_tipi_sonuc.get("form_tipi", "Tam")
+                secim = st.radio(
+                    "Aktif form tipi",
+                    ["Tam Anket (Dosyasız)", "Kısa Form (Öğrenci Bilgisi + Belge)"],
+                    index=0 if mevcut_form_tipi == "Tam" else 1,
+                )
+                if st.button("💾 Form Tipini Kaydet", type="primary"):
+                    yeni_deger = "Tam" if secim == "Tam Anket (Dosyasız)" else "Kisa"
+                    try:
+                        if _update_form_tipi(yeni_deger):
+                            st.success("Form tipi güncellendi.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("Form tipi güncellenemedi.")
+                    except Exception as e:
+                        st.error(f"Form tipi güncellenemedi: {e}")
 
         with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=False):
             try:
