@@ -97,6 +97,7 @@ def _update_review_status(tc_no, value: str) -> bool:
     return resp.json().get("ok", False)
 
 
+@st.cache_data(ttl=15, show_spinner=False)
 def _fetch_all_rows() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
     resp = requests.get(
@@ -144,6 +145,7 @@ def _update_form_tipi(form_tipi: str) -> bool:
     return resp.json().get("ok", False)
 
 
+@st.cache_data(ttl=15, show_spinner=False)
 def _fetch_donemler() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
     resp = requests.get(
@@ -178,6 +180,7 @@ def _delete_row(tc_no, donem) -> bool:
     return resp.json().get("ok", False)
 
 
+@st.cache_data(ttl=15, show_spinner=False)
 def _fetch_sorular() -> dict:
     """Yönetici paneli için TÜM ek soruları (aktif+pasif) getirir."""
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -361,7 +364,7 @@ def _silme_onay_dialogu():
                     st.error(f"{tc_no} silinemedi: {e}")
             st.session_state.silinecek_kayitlar = set()
             st.session_state["silme_onay_bekliyor"] = False
-            st.cache_data.clear()
+            _fetch_all_rows.clear()
             st.session_state["silme_basarili_sayisi"] = basarili
             st.rerun()
     with col2:
@@ -834,7 +837,7 @@ else:
                     try:
                         if _update_form_tipi(yeni_deger):
                             st.success("Form tipi güncellendi.")
-                            st.cache_data.clear()
+                            _fetch_form_tipi.clear()
                             st.rerun()
                         else:
                             st.error("Form tipi güncellenemedi.")
@@ -885,7 +888,8 @@ else:
                             sonuc = _sync_donemler(temiz_liste)
                             if sonuc.get("ok"):
                                 st.success("Dönemler güncellendi.")
-                                st.cache_data.clear()
+                                _fetch_donemler.clear()
+                                _fetch_settings.clear()
                                 st.rerun()
                             else:
                                 st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
@@ -950,7 +954,8 @@ else:
                         sonuc = _sync_sorular(temiz_liste)
                         if sonuc.get("ok"):
                             st.success("Sorular güncellendi.")
-                            st.cache_data.clear()
+                            _fetch_sorular.clear()
+                            _fetch_sorular_aktif.clear()
                             st.rerun()
                         else:
                             st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
@@ -1136,7 +1141,7 @@ else:
                                 st.error(f"{tc_no} güncellenemedi: {e}")
                     if degisen:
                         st.success(f"{degisen} kayıt güncellendi.")
-                        st.cache_data.clear()
+                        _fetch_all_rows.clear()
                         st.rerun()
                     else:
                         st.info("Değişiklik bulunamadı.")
