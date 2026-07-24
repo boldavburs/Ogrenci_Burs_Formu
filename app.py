@@ -561,7 +561,7 @@ if st.session_state.view == "form":
     d1, d2 = st.columns(2)
     with d1:
         dogum_il, dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "ogrenci_dogum")
-    st.markdown("**Nüfusa Kayıtlı Olduğu Yer**")
+    st.markdown("**Nüfus Kütüğüne Kayıtlı Olduğu Yer**")
     n1, n2 = st.columns(2)
     with n1:
         st.selectbox(
