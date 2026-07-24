@@ -42,7 +42,7 @@ except Exception:
 # Sadece bu 2 değeri değiştirerek TÜM metin kutusu, seçim kutusu (selectbox/
 # selectbox içindeki "İl seçiniz" gibi yer tutucu yazılar dahil) ve tarih
 # seçim kutularının arka plan / yazı rengini tek yerden kontrol edebilirsiniz.
-GIRIS_ALANI_ARKA_PLAN_RENGI = "#FFFFFF"  # kutuların arka plan rengi
+GIRIS_ALANI_ARKA_PLAN_RENGI = "#c9c7c7"  # kutuların arka plan rengi
 GIRIS_ALANI_YAZI_RENGI = "#000000"       # kutu içindeki yazı ve yer tutucu rengi (normal siyah)
 
 st.markdown(
