@@ -131,30 +131,6 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
-@st.cache_data(ttl=30, show_spinner=False)
-def _fetch_form_tipi() -> dict:
-    """Hangi form tipinin (Tam Anket / Kısa Form) aktif olduğunu getirir (önbelleğe alınır)."""
-    url = st.secrets["APPS_SCRIPT_URL"]
-    resp = requests.get(
-        url,
-        params={"action": "get_form_tipi", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _update_form_tipi(form_tipi: str) -> bool:
-    payload = {
-        "action": "update_form_tipi",
-        "form_tipi": form_tipi,
-        "secret": st.secrets["APPS_SCRIPT_SECRET"],
-    }
-    resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
-    resp.raise_for_status()
-    return resp.json().get("ok", False)
-
-
 @st.cache_data(ttl=15, show_spinner=False)
 def _fetch_donemler() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -528,7 +504,7 @@ if st.session_state.view == "form":
     aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
 
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
-    if _ust_serit("Bol-Dav Öğrenci Burs Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
+    if _ust_serit("Bol-Dav Öğrenci Burs Bilgi ve Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
         st.session_state.view = "admin"
         st.rerun()
 
@@ -539,11 +515,7 @@ if st.session_state.view == "form":
         st.warning("📌 Başvurular şu anda kapalıdır. Yeni dönem başvuruları açıldığında bu sayfadan duyurulacaktır.")
         st.stop()
 
-    try:
-        form_tipi_sonuc = _fetch_form_tipi()
-        form_tipi = form_tipi_sonuc.get("form_tipi", "Tam") if form_tipi_sonuc.get("ok") else "Tam"
-    except Exception:
-        form_tipi = "Tam"
+    form_tipi = ayarlar.get("form_tipi", "Tam") if ayarlar.get("ok") else "Tam"
     kisa_form_mu = form_tipi == "Kisa"
 
     st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
@@ -916,44 +888,6 @@ else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
 
-        if "exp_form_tipi_acik" not in st.session_state:
-            st.session_state.exp_form_tipi_acik = False
-        with st.expander("🧾 Form Tipi (Hangi form öğrenciye gösterilsin?)", expanded=st.session_state.exp_form_tipi_acik):
-            st.caption(
-                "**Tam Anket:** Mevcut tüm sorular (öğrenci/aile/eğitim/sosyoekonomik bilgiler) gösterilir, "
-                "**belge yükleme yoktur**.\n\n"
-                "**Kısa Form:** Sadece 1. Öğrenci Bilgileri bölümü + belge yükleme gösterilir, "
-                "diğer tüm bölümler (ikamet, eğitim, aile, sosyoekonomik, ek sorular) formda görünmez."
-            )
-            if st.session_state.get("form_tipi_basarili"):
-                st.success("✅ Form tipi güncellendi.")
-                st.session_state.form_tipi_basarili = False
-            try:
-                form_tipi_sonuc = _fetch_form_tipi()
-            except Exception as e:
-                form_tipi_sonuc = {"ok": False}
-                st.error(f"Form tipi alınamadı: {e}")
-
-            if form_tipi_sonuc.get("ok"):
-                mevcut_form_tipi = form_tipi_sonuc.get("form_tipi", "Tam")
-                secim = st.radio(
-                    "Aktif form tipi",
-                    ["Tam Anket (Dosyasız)", "Kısa Form (Öğrenci Bilgisi + Belge)"],
-                    index=0 if mevcut_form_tipi == "Tam" else 1,
-                )
-                if st.button("💾 Form Tipini Kaydet", type="primary"):
-                    yeni_deger = "Tam" if secim == "Tam Anket (Dosyasız)" else "Kisa"
-                    try:
-                        if _update_form_tipi(yeni_deger):
-                            _fetch_form_tipi.clear()
-                            st.session_state.form_tipi_basarili = True
-                            st.session_state.exp_form_tipi_acik = True
-                            st.rerun()
-                        else:
-                            st.error("Form tipi güncellenemedi.")
-                    except Exception as e:
-                        st.error(f"Form tipi güncellenemedi: {e}")
-
         if "exp_donem_acik" not in st.session_state:
             st.session_state.exp_donem_acik = False
         with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=st.session_state.exp_donem_acik):
@@ -970,12 +904,18 @@ else:
                 st.caption(
                     "Tabloya yeni satır ekleyerek yeni dönem oluşturun, isimleri doğrudan düzenleyin, "
                     "satır silmek için satırın solundaki kutucuğu işaretleyip çöp kutusuna basın. "
-                    "**Aynı anda yalnızca bir dönem 'Aktif' olabilir** — o dönem formda görünür ve "
-                    "başvuruları/dosyaları kendi Drive klasörüne kaydeder."
+                    "**Aynı anda yalnızca bir dönem 'Aktif' olabilir** — o dönem formda görünür, "
+                    "başvuruları/dosyaları kendi Drive klasörüne kaydeder ve **kendi Form Tipi ayarına göre** "
+                    "öğrenciye Tam Anket ya da Kısa Form gösterir."
                 )
                 donem_df = pd.DataFrame(donem_sonuc.get("donemler", []))
                 if donem_df.empty:
-                    donem_df = pd.DataFrame([{"ad": "", "durum": "Pasif"}])
+                    donem_df = pd.DataFrame([{"ad": "", "durum": "Pasif", "form_tipi": "Tam"}])
+                if "form_tipi" not in donem_df.columns:
+                    donem_df["form_tipi"] = "Tam"
+                donem_df["form_tipi"] = (
+                    donem_df["form_tipi"].map({"Tam": "Tam Anket", "Kisa": "Kısa Form"}).fillna("Tam Anket")
+                )
 
                 edited_donem_df = st.data_editor(
                     donem_df,
@@ -985,13 +925,20 @@ else:
                     column_config={
                         "ad": st.column_config.TextColumn("Dönem Adı", required=True),
                         "durum": st.column_config.SelectboxColumn("Durum", options=["Aktif", "Pasif"], required=True),
+                        "form_tipi": st.column_config.SelectboxColumn(
+                            "Form Tipi", options=["Tam Anket", "Kısa Form"], required=True
+                        ),
                     },
                     key="donem_editor",
                 )
 
                 if st.button("💾 Dönemleri Kaydet", type="primary"):
                     temiz_liste = [
-                        {"ad": str(r["ad"]).strip(), "durum": r["durum"]}
+                        {
+                            "ad": str(r["ad"]).strip(),
+                            "durum": r["durum"],
+                            "form_tipi": "Kisa" if r["form_tipi"] == "Kısa Form" else "Tam",
+                        }
                         for _, r in edited_donem_df.iterrows()
                         if str(r["ad"]).strip()
                     ]
