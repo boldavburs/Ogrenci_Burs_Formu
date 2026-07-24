@@ -307,11 +307,16 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
             )
         with col_logo:
             if logo_b64:
+                # LOGO_BOYUT: logo çapı (px). LOGO_DIKEY_KAYDIRMA: negatif değer yukarı,
+                # pozitif değer aşağı kaydırır — sadece bu iki değeri değiştirerek ayarlayın.
+                LOGO_BOYUT = 100
+                LOGO_DIKEY_KAYDIRMA = "-10px"
                 st.markdown(
                     f'<div style="text-align:center;">'
                     f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:100px; width:100px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:8px; object-fit:cover; display:inline-block; vertical-align:middle;" /></div>',
+                    f'style="height:{LOGO_BOYUT}px; width:{LOGO_BOYUT}px; border-radius:50%; '
+                    f'background:#FFFFFF; padding:4px; object-fit:cover; display:inline-block; '
+                    f'vertical-align:middle; position:relative; top:{LOGO_DIKEY_KAYDIRMA};" /></div>',
                     unsafe_allow_html=True,
                 )
         with col_buton:
