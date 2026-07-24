@@ -1,6 +1,3 @@
-    #/* =======================================================================================================================
-    #                         MUSTAFA SABRİ DOĞRUYOL - msabridogruyol.com - info@msabridogruyol.com
-    #   ======================================================================================================================= */
 import json
 import base64
 from datetime import date, datetime
@@ -11,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
 # ============================================================================
 # AYARLAR
 # ============================================================================
@@ -55,6 +53,17 @@ try:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
 except Exception:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="📋", layout="wide")
+
+# Sayfa kaynağında ("İncele" / "Sayfa Kaynağını Görüntüle") görünecek imza.
+# Sadece bu metni değiştirerek imzayı güncelleyebilirsiniz.
+st.markdown(
+    """
+    <!-- =======================================================================================================================
+                            MUSTAFA SABRİ DOĞRUYOL - msabridogruyol.com - info@msabridogruyol.com
+       ======================================================================================================================= -->
+    """,
+    unsafe_allow_html=True,
+)
 
 # ============================================================================
 # GİRİŞ ALANLARI RENK AYARI (metin kutusu / seçim kutusu arka planı ve yazı rengi)
@@ -563,7 +572,7 @@ if st.session_state.view == "form":
     d1, d2 = st.columns(2)
     with d1:
         dogum_il, dogum_ilce = _il_ilce_secimi("İl *", "İlçe *", "ogrenci_dogum")
-    st.markdown("**Nüfus Kütüğüne Kayıtlı Olduğu Yer**")
+    st.markdown("**Nüfusa Kayıtlı Olduğu Yer**")
     n1, n2 = st.columns(2)
     with n1:
         st.selectbox(
@@ -572,7 +581,7 @@ if st.session_state.view == "form":
         nufus_il = BOLVADIN_IL_ILCE_SABIT
     with n2:
         nufus_ilce = st.selectbox(
-            "Merkez / Belde / Köy *", BOLVADIN_YERLESIM_YERLERI, index=None,
+            "Merkez / Köy *", BOLVADIN_YERLESIM_YERLERI, index=None,
             placeholder="Seçiniz", key="nufus_koy",
         )
 
@@ -1398,7 +1407,3 @@ else:
         if st.button("Çıkış Yap"):
             st.session_state.admin_authed = False
             st.rerun()
-            
-    #/* =======================================================================================================================
-    #                         MUSTAFA SABRİ DOĞRUYOL - msabridogruyol.com - info@msabridogruyol.com
-    #   ======================================================================================================================= */
