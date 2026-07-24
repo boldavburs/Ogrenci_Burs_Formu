@@ -12,12 +12,21 @@ import streamlit as st
 # ============================================================================
 # AYARLAR
 # ============================================================================
-# NOT (varsayım): Yüklenecek 3 sabit belge aşağıdaki gibi kabul edilmiştir.
-# Farklıysa SADECE bu listeyi değiştirmeniz yeterlidir, başka yer değişmez.
+# Kısa Form'daki "Belgeler" bölümünde istenen belgeler. Fotoğraf hariç hepsi
+# sadece PDF kabul eder. Sadece bu listeyi değiştirerek belge setini
+# güncelleyebilirsiniz, başka yer değişmez.
 REQUIRED_DOCUMENTS = [
-    {"key": "ogrenci_belgesi", "label": "Öğrenci Belgesi"},
-    {"key": "kimlik_fotokopisi", "label": "Nüfus Cüzdanı / Kimlik Fotokopisi"},
-    {"key": "gelir_belgesi", "label": "Aile Gelir Durumunu Gösterir Belge"},
+    {"key": "vukuatli_nufus_kaydi", "label": "Öğrenci Aile Vukuatlı Nüfus Kayıt Örneği", "tur": ["pdf"]},
+    {"key": "anne_baba_gelir_belgesi", "label": "Baba ve Anne Maaş Gelir Belgesi", "tur": ["pdf"]},
+    {"key": "ogrenci_kimlik_belgesi", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi", "tur": ["pdf"]},
+    {"key": "ikametgah_belgesi", "label": "Aile İkametgah Belgesi", "tur": ["pdf"]},
+    {"key": "adli_sicil_belgesi", "label": "Adli Sicil Kayıt Belgesi", "tur": ["pdf"]},
+    {"key": "lise_diploma_belgesi", "label": "Lise Öğrenci Diploma Belgesi ve Notu", "tur": ["pdf"]},
+    {"key": "yks_yerlesme_belgesi", "label": "YKS Yerleşme Belgesi", "tur": ["pdf"]},
+    {"key": "universite_kayit_belgesi", "label": "Üniversite Kayıt Öğrenci Belgesi", "tur": ["pdf"]},
+    {"key": "transkript", "label": "Transkript (ara sınıflar için)", "tur": ["pdf"]},
+    {"key": "banka_iban", "label": "Öğrenci Banka ve İban Numarası", "tur": ["pdf"]},
+    {"key": "vesikalik_fotograf", "label": "1 Adet Vesikalık Fotoğraf", "tur": ["jpg", "jpeg", "png"]},
 ]
 
 MESLEK_SECENEKLERI = [
@@ -683,10 +692,13 @@ if st.session_state.view == "form":
     uploaded = {}
     if kisa_form_mu:
         _bolum_basligi("2", "Belgeler")
-        st.caption("Kabul edilen dosya türleri: PDF, JPG, PNG — dosya başına en fazla 10 MB.")
+        st.caption(
+            "Vesikalık fotoğraf hariç tüm belgeler **PDF** formatında olmalıdır "
+            "(dosya başına en fazla 10 MB). Vesikalık fotoğraf için JPG/PNG kabul edilir."
+        )
         for doc in REQUIRED_DOCUMENTS:
             uploaded[doc["key"]] = st.file_uploader(
-                f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
+                f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
             )
 
     if kisa_form_mu:
