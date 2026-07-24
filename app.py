@@ -502,9 +502,14 @@ if st.session_state.view == "form":
 
     donem_adi = ayarlar.get("donem", "") if ayarlar.get("ok") else ""
     aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
+    form_tipi_erken = ayarlar.get("form_tipi", "Tam") if ayarlar.get("ok") else "Tam"
 
+    ana_baslik = (
+        "Bol-Dav Vicdani Yükümlülük Taahhütnamesi" if form_tipi_erken == "Kisa"
+        else "Bol-Dav Öğrenci Burs Başvuru Formu"
+    )
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
-    if _ust_serit("Bol-Dav Öğrenci Burs Bilgi ve Başvuru Formu", alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
+    if _ust_serit(ana_baslik, alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
         st.session_state.view = "admin"
         st.rerun()
 
@@ -515,7 +520,7 @@ if st.session_state.view == "form":
         st.warning("📌 Başvurular şu anda kapalıdır. Yeni dönem başvuruları açıldığında bu sayfadan duyurulacaktır.")
         st.stop()
 
-    form_tipi = ayarlar.get("form_tipi", "Tam") if ayarlar.get("ok") else "Tam"
+    form_tipi = form_tipi_erken
     kisa_form_mu = form_tipi == "Kisa"
 
     st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
