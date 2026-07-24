@@ -1367,12 +1367,12 @@ else:
                 if not gorunur_satirlar:
                     st.info("Gösterilecek kayıt yok.")
                 else:
-                    for tc_no, donem_deger, ad, bolum in gorunur_satirlar:
+                    for i, (tc_no, donem_deger, ad, bolum) in enumerate(gorunur_satirlar):
                         c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
                         c1.write(ad)
                         c2.write(bolum)
                         c3.write(donem_deger)
-                        if c4.button("🗑️", key=f"kaldir_{tc_no}_{donem_deger}", help="Listeden kaldır"):
+                        if c4.button("🗑️", key=f"kaldir_{i}_{tc_no}_{donem_deger}", help="Listeden kaldır"):
                             st.session_state.silinecek_kayitlar.add((tc_no, donem_deger))
                             st.rerun()
 
