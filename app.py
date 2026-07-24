@@ -40,6 +40,15 @@ TURKCE_AYLAR = [
     "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ]
 
+# Nüfusa Kayıtlı Olduğu Yer alanı için: Bol-Dav yalnızca Bolvadinlilere burs verdiğinden
+# il/ilçe serbest seçimi yerine sabit "Afyonkarahisar - Bolvadin" + Merkez/köy listesi kullanılır.
+BOLVADIN_IL_ILCE_SABIT = "Afyonkarahisar - Bolvadin"
+BOLVADIN_YERLESIM_YERLERI = [
+    "Merkez", "Büyükkarabağ", "Derekarabağ", "Dipevler", "Dişli", "Güney", "Hamidiye",
+    "Karayokuş", "Kemerkaya", "Kurucaova", "Kutlu", "Nusratlı", "Ortakarabağ",
+    "Özburun", "Taşağıl", "Taşlıdere", "Yürükkaracaören",
+]
+
 try:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
 except Exception:
@@ -555,7 +564,15 @@ if st.session_state.view == "form":
     st.markdown("**Nüfusa Kayıtlı Olduğu Yer**")
     n1, n2 = st.columns(2)
     with n1:
-        nufus_il, nufus_ilce = _il_ilce_secimi("İl *", "İlçe *", "nufus_kayit")
+        st.selectbox(
+            "İl", [BOLVADIN_IL_ILCE_SABIT], index=0, disabled=True, key="nufus_il_sabit",
+        )
+        nufus_il = BOLVADIN_IL_ILCE_SABIT
+    with n2:
+        nufus_ilce = st.selectbox(
+            "Merkez / Köy *", BOLVADIN_YERLESIM_YERLERI, index=None,
+            placeholder="Seçiniz", key="nufus_koy",
+        )
 
     # -------- Aşağıdaki bölümler SADECE "Tam Anket" form tipinde gösterilir --------
     ikamet_il = ikamet_ilce = kaldigi_yer = None
@@ -767,7 +784,7 @@ if st.session_state.view == "form":
 
         il_ilce_kontrol_listesi = [
             (dogum_il, dogum_ilce, "Öğrenci Doğum Yeri (İl/İlçe)"),
-            (nufus_il, nufus_ilce, "Nüfusa Kayıtlı Olduğu Yer (İl/İlçe)"),
+            (nufus_il, nufus_ilce, "Nüfusa Kayıtlı Olduğu Yer (Merkez/Köy)"),
         ]
         if not kisa_form_mu:
             il_ilce_kontrol_listesi += [
