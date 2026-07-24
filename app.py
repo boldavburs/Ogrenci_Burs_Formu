@@ -747,7 +747,8 @@ if st.session_state.view == "form":
     else:
         onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
 
-    submitted = st.button("Başvuruyu Gönder", use_container_width=True, type="primary")
+    gonder_buton_metni = "Taahhütnameyi Onayla" if kisa_form_mu else "Başvuruyu Gönder"
+    submitted = st.button(gonder_buton_metni, use_container_width=True, type="primary")
 
     if submitted:
         zorunlu_metin_alanlari = {
