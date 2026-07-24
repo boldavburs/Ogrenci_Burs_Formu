@@ -1249,18 +1249,18 @@ else:
                 with dl_col2:
                     if "Form Tipi" in df_tum.columns:
                         dl_form_tipi_serisi = df_tum["Form Tipi"].dropna().astype(str).str.strip()
-                        dl_form_tipleri = ["Tümü"] + sorted(
-                            dl_form_tipi_serisi[dl_form_tipi_serisi != ""].unique().tolist()
-                        )
+                        dl_form_tipleri = sorted(dl_form_tipi_serisi[dl_form_tipi_serisi != ""].unique().tolist())
                     else:
-                        dl_form_tipleri = ["Tümü"]
+                        dl_form_tipleri = []
+                    if not dl_form_tipleri:
+                        dl_form_tipleri = ["Tam Anket", "Kısa Form"]
                     indirilecek_form_tipi = st.selectbox("İndirilecek Form Tipi", dl_form_tipleri, key="indir_form_tipi")
 
                 if st.button("📊 Excel Oluştur", use_container_width=True):
                     export_df = df_tum.copy()
                     if indirilecek_donem != "Tümü" and "Dönem" in export_df.columns:
                         export_df = export_df[export_df["Dönem"] == indirilecek_donem]
-                    if indirilecek_form_tipi != "Tümü" and "Form Tipi" in export_df.columns:
+                    if "Form Tipi" in export_df.columns:
                         export_df = export_df[export_df["Form Tipi"] == indirilecek_form_tipi]
                         export_df = export_df.dropna(axis=1, how="all")
                         export_df = export_df.loc[
