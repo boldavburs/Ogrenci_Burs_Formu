@@ -812,13 +812,18 @@ else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
 
-        with st.expander("🧾 Form Tipi (Hangi form öğrenciye gösterilsin?)", expanded=False):
+        if "exp_form_tipi_acik" not in st.session_state:
+            st.session_state.exp_form_tipi_acik = False
+        with st.expander("🧾 Form Tipi (Hangi form öğrenciye gösterilsin?)", expanded=st.session_state.exp_form_tipi_acik):
             st.caption(
                 "**Tam Anket:** Mevcut tüm sorular (öğrenci/aile/eğitim/sosyoekonomik bilgiler) gösterilir, "
                 "**belge yükleme yoktur**.\n\n"
                 "**Kısa Form:** Sadece 1. Öğrenci Bilgileri bölümü + belge yükleme gösterilir, "
                 "diğer tüm bölümler (ikamet, eğitim, aile, sosyoekonomik, ek sorular) formda görünmez."
             )
+            if st.session_state.get("form_tipi_basarili"):
+                st.success("✅ Form tipi güncellendi.")
+                st.session_state.form_tipi_basarili = False
             try:
                 form_tipi_sonuc = _fetch_form_tipi()
             except Exception as e:
@@ -836,15 +841,21 @@ else:
                     yeni_deger = "Tam" if secim == "Tam Anket (Dosyasız)" else "Kisa"
                     try:
                         if _update_form_tipi(yeni_deger):
-                            st.success("Form tipi güncellendi.")
                             _fetch_form_tipi.clear()
+                            st.session_state.form_tipi_basarili = True
+                            st.session_state.exp_form_tipi_acik = True
                             st.rerun()
                         else:
                             st.error("Form tipi güncellenemedi.")
                     except Exception as e:
                         st.error(f"Form tipi güncellenemedi: {e}")
 
-        with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=False):
+        if "exp_donem_acik" not in st.session_state:
+            st.session_state.exp_donem_acik = False
+        with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=st.session_state.exp_donem_acik):
+            if st.session_state.get("donem_basarili"):
+                st.success("✅ Dönemler güncellendi.")
+                st.session_state.donem_basarili = False
             try:
                 donem_sonuc = _fetch_donemler()
             except Exception as e:
@@ -887,22 +898,28 @@ else:
                         try:
                             sonuc = _sync_donemler(temiz_liste)
                             if sonuc.get("ok"):
-                                st.success("Dönemler güncellendi.")
                                 _fetch_donemler.clear()
                                 _fetch_settings.clear()
+                                st.session_state.donem_basarili = True
+                                st.session_state.exp_donem_acik = True
                                 st.rerun()
                             else:
                                 st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
                         except Exception as e:
                             st.error(f"Güncellenemedi: {e}")
 
-        with st.expander("📝 Form Soruları (Ek Sorular) Yönetimi", expanded=False):
+        if "exp_sorular_acik" not in st.session_state:
+            st.session_state.exp_sorular_acik = False
+        with st.expander("📝 Form Soruları (Ek Sorular) Yönetimi", expanded=st.session_state.exp_sorular_acik):
             st.caption(
                 "Buradan eklediğiniz sorular, sabit alanların (T.C., aile bilgileri vb.) ALTINA, "
                 "'Ek Sorular' başlığı altında forma otomatik eklenir. Sadece 'Aktif' işaretli sorular "
                 "öğrenciye gösterilir. **Seçenekler** sütununu yalnızca Tip='Seçenekli' ise, "
                 "seçenekleri virgülle ayırarak doldurun (örn: Evet, Hayır, Bilmiyorum)."
             )
+            if st.session_state.get("sorular_basarili"):
+                st.success("✅ Sorular güncellendi.")
+                st.session_state.sorular_basarili = False
             try:
                 sorular_sonuc = _fetch_sorular()
             except Exception as e:
@@ -953,9 +970,10 @@ else:
                     try:
                         sonuc = _sync_sorular(temiz_liste)
                         if sonuc.get("ok"):
-                            st.success("Sorular güncellendi.")
                             _fetch_sorular.clear()
                             _fetch_sorular_aktif.clear()
+                            st.session_state.sorular_basarili = True
+                            st.session_state.exp_sorular_acik = True
                             st.rerun()
                         else:
                             st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
