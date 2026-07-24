@@ -570,7 +570,7 @@ if st.session_state.view == "form":
         nufus_il = BOLVADIN_IL_ILCE_SABIT
     with n2:
         nufus_ilce = st.selectbox(
-            "Merkez / Köy *", BOLVADIN_YERLESIM_YERLERI, index=None,
+            "Merkez / Belde / Köy *", BOLVADIN_YERLESIM_YERLERI, index=None,
             placeholder="Seçiniz", key="nufus_koy",
         )
 
