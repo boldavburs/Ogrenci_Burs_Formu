@@ -600,7 +600,10 @@ if st.session_state.view == "form":
                 f"{doc['label']} *", type=["pdf", "jpg", "jpeg", "png"], key=doc["key"]
             )
 
-    onay_no = "3" if kisa_form_mu else "7"
+    if kisa_form_mu:
+        onay_no = "3"
+    else:
+        onay_no = "7" if aktif_sorular else "6"
     _bolum_basligi(onay_no, "Onay")
     onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
 
