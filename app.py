@@ -1115,6 +1115,15 @@ else:
             else:
                 df = df_tum
 
+            if "Form Tipi" in df.columns:
+                form_tipleri = ["Tümü"] + sorted(df["Form Tipi"].dropna().unique().tolist())
+                secilen_form_tipi = st.selectbox("🧾 Form Tipi Filtrele", form_tipleri)
+                if secilen_form_tipi != "Tümü":
+                    df = df[df["Form Tipi"] == secilen_form_tipi].copy()
+                    # Bu form tipinde tamamen boş kalan sütunları gizle (temiz görünüm/indirme için)
+                    df = df.dropna(axis=1, how="all")
+                    df = df.loc[:, ~(df.astype(str).apply(lambda s: s.str.strip()) == "").all()]
+
             tab_genel, tab_liste, tab_evrak = st.tabs(
                 ["📊 Genel Bakış", "📋 Başvuru Listesi", "📁 Evrak Klasörleri"]
             )
