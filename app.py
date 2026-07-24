@@ -696,10 +696,15 @@ if st.session_state.view == "form":
             "Vesikalık fotoğraf hariç tüm belgeler **PDF** formatında olmalıdır "
             "(dosya başına en fazla 10 MB). Vesikalık fotoğraf için JPG/PNG kabul edilir."
         )
-        for doc in REQUIRED_DOCUMENTS:
-            uploaded[doc["key"]] = st.file_uploader(
-                f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
-            )
+        SUTUN_SAYISI = 3
+        for i in range(0, len(REQUIRED_DOCUMENTS), SUTUN_SAYISI):
+            satir_belgeleri = REQUIRED_DOCUMENTS[i:i + SUTUN_SAYISI]
+            kolonlar = st.columns(SUTUN_SAYISI)
+            for kolon, doc in zip(kolonlar, satir_belgeleri):
+                with kolon:
+                    uploaded[doc["key"]] = st.file_uploader(
+                        f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
+                    )
 
     if kisa_form_mu:
         onay_no = "3"
