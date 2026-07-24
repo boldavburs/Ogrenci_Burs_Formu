@@ -310,8 +310,8 @@ def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key:
                 st.markdown(
                     f'<div style="text-align:center;">'
                     f'<img src="data:image/png;base64,{logo_b64}" '
-                    f'style="height:56px; width:56px; border-radius:50%; background:#FFFFFF; '
-                    f'padding:3px; object-fit:cover; display:inline-block; vertical-align:middle;" /></div>',
+                    f'style="height:84px; width:84px; border-radius:50%; background:#FFFFFF; '
+                    f'padding:4px; object-fit:cover; display:inline-block; vertical-align:middle;" /></div>',
                     unsafe_allow_html=True,
                 )
         with col_buton:
