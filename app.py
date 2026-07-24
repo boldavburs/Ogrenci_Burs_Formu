@@ -1116,7 +1116,8 @@ else:
                 df = df_tum
 
             if "Form Tipi" in df.columns:
-                form_tipleri = ["Tümü"] + sorted(df["Form Tipi"].dropna().unique().tolist())
+                form_tipi_serisi = df["Form Tipi"].dropna().astype(str).str.strip()
+                form_tipleri = ["Tümü"] + sorted(form_tipi_serisi[form_tipi_serisi != ""].unique().tolist())
                 secilen_form_tipi = st.selectbox("🧾 Form Tipi Filtrele", form_tipleri)
                 if secilen_form_tipi != "Tümü":
                     df = df[df["Form Tipi"] == secilen_form_tipi].copy()
@@ -1247,7 +1248,10 @@ else:
                     indirilecek_donem = st.selectbox("İndirilecek Dönem", dl_donemler, key="indir_donem")
                 with dl_col2:
                     if "Form Tipi" in df_tum.columns:
-                        dl_form_tipleri = ["Tümü"] + sorted(df_tum["Form Tipi"].dropna().unique().tolist())
+                        dl_form_tipi_serisi = df_tum["Form Tipi"].dropna().astype(str).str.strip()
+                        dl_form_tipleri = ["Tümü"] + sorted(
+                            dl_form_tipi_serisi[dl_form_tipi_serisi != ""].unique().tolist()
+                        )
                     else:
                         dl_form_tipleri = ["Tümü"]
                     indirilecek_form_tipi = st.selectbox("İndirilecek Form Tipi", dl_form_tipleri, key="indir_form_tipi")
