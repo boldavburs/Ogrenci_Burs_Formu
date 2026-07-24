@@ -604,8 +604,40 @@ if st.session_state.view == "form":
         onay_no = "3"
     else:
         onay_no = "7" if aktif_sorular else "6"
+    ONAY_IFADESI = "Bol-Dav Burs Başvurusu Yükümlülük Taahhütnamesini Okudum Onaylıyorum"
+
     _bolum_basligi(onay_no, "Onay")
-    onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
+    if kisa_form_mu:
+        st.markdown(
+            """
+            <div style="background:#FAFAFA; border:1px solid #E5E5E5; border-radius:8px;
+                        padding:1.25rem 1.5rem; font-size:14px; line-height:1.8; color:#111111;">
+                <p style="text-align:center; font-weight:600; margin:0 0 12px;">BOL-DAV BURSLARI KARŞILIKSIZDIR</p>
+                <p>Öğrenim hayatım boyunca akademik başarı düzeyimi, BOL-DAV Vakfı Burs Verme Usul ve
+                Esaslarında belirtilen kriterlerin üzerinde tutmak için azami gayret göstereceğimi;
+                vakfımızın teşvik ettiği sosyal, kültürel ve toplumsal sorumluluk projelerine aktif olarak
+                katılım sağlamaya çalışacağımı beyan ediyorum.</p>
+                <p>Allah nasip eder de eğitimimi tamamlayıp çalışma hayatına atılırsam, imkânlarım
+                ölçüsünde BOL-DAV'a maddi ve manevi destek vermeyi; bir zamanlar bana uzanan yardım elini,
+                kendim gibi eğitim hayatını sürdüren en az bir Bolvadinli üniversite öğrencisine ulaştırmak
+                amacıyla BOL-DAV aracılığıyla burs vermeyi hedef olarak benimsediğimi ifade ediyorum.</p>
+                <p>Ayrıca, BOL-DAV'ın amaç ve faaliyetlerini bulunduğum her ortamda tanıtmayı, vakfımızın
+                birlik ve dayanışma anlayışını temsil etmeyi, gönüllü bir kültür ve dayanışma elçisi olarak
+                hareket etmeyi vicdani bir sorumluluk ve vefa borcu olarak kabul ediyorum.</p>
+                <p style="text-align:center; font-weight:600; margin:16px 0 0;">BOL-DAV BOLVADİNLİLER DAYANIŞMA VAKFI</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        st.markdown(
+            f"Onaylamak için aşağıdaki kutuya **tam olarak** şunu yazın: "
+            f"\n\n> {ONAY_IFADESI}"
+        )
+        onay_metni = st.text_input("Onay ifadesi *", placeholder=ONAY_IFADESI)
+        onay = onay_metni.strip() == ONAY_IFADESI
+    else:
+        onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelendiririm. *")
 
     submitted = st.button("Başvuruyu Gönder", use_container_width=True, type="primary")
 
@@ -683,7 +715,10 @@ if st.session_state.view == "form":
                 if uploaded.get(doc["key"]) is None:
                     eksikler.append(doc["label"])
         if not onay:
-            eksikler.append("Onay kutusu işaretlenmeli")
+            if kisa_form_mu:
+                eksikler.append("Taahhütname ifadesi tam olarak yazılmalı")
+            else:
+                eksikler.append("Onay kutusu işaretlenmeli")
 
         if eksikler:
             st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
