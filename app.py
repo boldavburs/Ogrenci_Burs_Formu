@@ -43,7 +43,7 @@ except Exception:
 # selectbox içindeki "İl seçiniz" gibi yer tutucu yazılar dahil) ve tarih
 # seçim kutularının arka plan / yazı rengini tek yerden kontrol edebilirsiniz.
 GIRIS_ALANI_ARKA_PLAN_RENGI = "#FFFFFF"  # kutuların arka plan rengi
-GIRIS_ALANI_YAZI_RENGI = "#111111"       # kutu içindeki yazı ve yer tutucu rengi
+GIRIS_ALANI_YAZI_RENGI = "#000000"       # kutu içindeki yazı ve yer tutucu rengi (normal siyah)
 
 st.markdown(
     f"""
@@ -54,8 +54,13 @@ st.markdown(
         background-color: {GIRIS_ALANI_ARKA_PLAN_RENGI} !important;
         color: {GIRIS_ALANI_YAZI_RENGI} !important;
     }}
-    div[data-baseweb="select"] span {{
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] [class*="placeholder"],
+    input::placeholder, textarea::placeholder {{
         color: {GIRIS_ALANI_YAZI_RENGI} !important;
+        -webkit-text-fill-color: {GIRIS_ALANI_YAZI_RENGI} !important;
+        opacity: 1 !important;
     }}
     </style>
     """,
