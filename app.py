@@ -36,6 +36,32 @@ try:
 except Exception:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="📋", layout="wide")
 
+# ============================================================================
+# GİRİŞ ALANLARI RENK AYARI (metin kutusu / seçim kutusu arka planı ve yazı rengi)
+# ============================================================================
+# Sadece bu 2 değeri değiştirerek TÜM metin kutusu, seçim kutusu (selectbox/
+# selectbox içindeki "İl seçiniz" gibi yer tutucu yazılar dahil) ve tarih
+# seçim kutularının arka plan / yazı rengini tek yerden kontrol edebilirsiniz.
+GIRIS_ALANI_ARKA_PLAN_RENGI = "#FFFFFF"  # kutuların arka plan rengi
+GIRIS_ALANI_YAZI_RENGI = "#111111"       # kutu içindeki yazı ve yer tutucu rengi
+
+st.markdown(
+    f"""
+    <style>
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"],
+    input, textarea {{
+        background-color: {GIRIS_ALANI_ARKA_PLAN_RENGI} !important;
+        color: {GIRIS_ALANI_YAZI_RENGI} !important;
+    }}
+    div[data-baseweb="select"] span {{
+        color: {GIRIS_ALANI_YAZI_RENGI} !important;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 with open("data/il_ilce.json", "r", encoding="utf-8") as f:
     IL_ILCE = json.load(f)
 IL_LISTESI = list(IL_ILCE.keys())
