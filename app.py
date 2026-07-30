@@ -57,6 +57,16 @@ BELGE_FORM_DOKUMANLARI = [
     {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar", "tur": ["pdf"]},
 ]
 
+# Form Tipi kodları ("Tam"/"Kisa"/"Belge" — Donemler sayfasında saklanan iç kodlar)
+# ile kullanıcıya gösterilen isimler arasındaki eşleştirme. İsim değiştirmek
+# isterseniz SADECE bu sözlüğü güncellemeniz yeterli, başka yer değişmez.
+FORM_TIPI_GORUNEN = {
+    "Tam": "Burs Ön Değerlendirme Anketi",
+    "Kisa": "Burs Başvuru ve Taahhüt Formu",
+    "Belge": "Bursiyer Öğrenci Belge Güncelleme Formu",
+}
+FORM_TIPI_KOD = {v: k for k, v in FORM_TIPI_GORUNEN.items()}
+
 try:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
 except Exception:
@@ -633,7 +643,7 @@ if st.session_state.view == "form":
                     "action": "submit",
                     "timestamp": datetime.now().isoformat(),
                     "fields": {
-                        "Form Tipi": "Belge Gönderme",
+                        "Form Tipi": FORM_TIPI_GORUNEN["Belge"],
                         "Öğrenci Adı Soyadı": belge_ad_soyad,
                         "Cinsiyet": belge_cinsiyet,
                         "Üniversite Adı": belge_universite_final,
@@ -969,7 +979,7 @@ if st.session_state.view == "form":
             st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
         else:
             temel_alanlar = {
-                "Form Tipi": "Kısa Form" if kisa_form_mu else "Tam Anket",
+                "Form Tipi": FORM_TIPI_GORUNEN["Kisa"] if kisa_form_mu else FORM_TIPI_GORUNEN["Tam"],
                 "Cinsiyet": cinsiyet, "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no,
                 "E-Posta Adresi": email, "Cep Telefon Numarası": telefon,
                 "Öğrenci Doğum Tarihi": str(dogum_tarihi),
@@ -1071,17 +1081,16 @@ else:
                     "satır silmek için satırın solundaki kutucuğu işaretleyip çöp kutusuna basın. "
                     "**Aynı anda yalnızca bir dönem 'Aktif' olabilir** — o dönem formda görünür, "
                     "başvuruları/dosyaları kendi Drive klasörüne kaydeder ve **kendi Form Tipi ayarına göre** "
-                    "öğrenciye Tam Anket, Kısa Form ya da Belge Gönderme formunu gösterir."
+                    f"öğrenciye {FORM_TIPI_GORUNEN['Tam']}, {FORM_TIPI_GORUNEN['Kisa']} ya da "
+                    f"{FORM_TIPI_GORUNEN['Belge']} formunu gösterir."
                 )
-                FORM_TIPI_GORUNEN = {"Tam": "Tam Anket", "Kisa": "Kısa Form", "Belge": "Belge Gönderme"}
-                FORM_TIPI_KOD = {v: k for k, v in FORM_TIPI_GORUNEN.items()}
 
                 donem_df = pd.DataFrame(donem_sonuc.get("donemler", []))
                 if donem_df.empty:
                     donem_df = pd.DataFrame([{"ad": "", "durum": "Pasif", "form_tipi": "Tam"}])
                 if "form_tipi" not in donem_df.columns:
                     donem_df["form_tipi"] = "Tam"
-                donem_df["form_tipi"] = donem_df["form_tipi"].map(FORM_TIPI_GORUNEN).fillna("Tam Anket")
+                donem_df["form_tipi"] = donem_df["form_tipi"].map(FORM_TIPI_GORUNEN).fillna(FORM_TIPI_GORUNEN["Tam"])
 
                 edited_donem_df = st.data_editor(
                     donem_df,
@@ -1366,7 +1375,7 @@ else:
                     else:
                         dl_form_tipleri = []
                     if not dl_form_tipleri:
-                        dl_form_tipleri = ["Tam Anket", "Kısa Form", "Belge Gönderme"]
+                        dl_form_tipleri = list(FORM_TIPI_GORUNEN.values())
                     indirilecek_form_tipi = st.selectbox("İndirilecek Form Tipi", dl_form_tipleri, key="indir_form_tipi")
 
                 if st.button("📊 Excel Oluştur", use_container_width=True):
