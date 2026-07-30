@@ -585,6 +585,7 @@ if st.session_state.view == "form":
         bc1, bc2 = st.columns(2)
         with bc1:
             belge_ad_soyad = st.text_input("Öğrenci Adı Soyadı *")
+            belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
             belge_universite = st.selectbox(
                 "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
                 placeholder="Üniversite adı yazarak arayın...",
@@ -593,7 +594,6 @@ if st.session_state.view == "form":
             if belge_universite == "Listede Yok / Diğer":
                 belge_universite_diger = st.text_input("Üniversite adını yazın *")
         with bc2:
-            belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
             belge_bolum = st.text_input("Bölümü *")
         belge_sinif_donem = st.text_input(
             "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
@@ -609,7 +609,7 @@ if st.session_state.view == "form":
             for kolon, doc in zip(kolonlar, satir_belgeleri):
                 with kolon:
                     belge_uploaded[doc["key"]] = st.file_uploader(
-                        f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        doc["label"], type=doc.get("tur", ["pdf"]), key=doc["key"]
                     )
 
         _bolum_basligi("3", "Onay")
@@ -627,9 +627,7 @@ if st.session_state.view == "form":
                 eksikler.append("Bölümü")
             if not belge_sinif_donem.strip():
                 eksikler.append("Sınıf ve Dönemi")
-            for doc in BELGE_FORM_DOKUMANLARI:
-                if belge_uploaded.get(doc["key"]) is None:
-                    eksikler.append(doc["label"])
+            # Belgeler artık isteğe bağlı — varsa yüklenir, yoksa boş geçilir.
             if not belge_onay:
                 eksikler.append("Onay kutusu işaretlenmeli")
 
@@ -653,6 +651,7 @@ if st.session_state.view == "form":
                     "files": {
                         doc["key"]: _file_to_b64(belge_uploaded[doc["key"]])
                         for doc in BELGE_FORM_DOKUMANLARI
+                        if belge_uploaded.get(doc["key"]) is not None
                     },
                     "folder_name": f"{belge_ad_soyad.strip()}_belge_gonderme",
                 }
