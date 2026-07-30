@@ -49,6 +49,14 @@ BOLVADIN_YERLESIM_YERLERI = [
     "Özburun", "Taşağıl", "Taşlıdere", "Yürükkaracaören",
 ]
 
+# "Belge Gönderme" (3. form tipi) için istenen belgeler.
+BELGE_FORM_DOKUMANLARI = [
+    {"key": "belge_transkript", "label": "Sınıf veya Dönem Transkript", "tur": ["pdf"]},
+    {"key": "belge_yeni_kayit", "label": "Sınıf veya Dönem Yeni Kayıt Belgesi", "tur": ["pdf"]},
+    {"key": "belge_mezuniyet", "label": "Mezuniyet Belgesi", "tur": ["pdf"]},
+    {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar", "tur": ["pdf"]},
+]
+
 try:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="logo.png", layout="wide")
 except Exception:
@@ -533,10 +541,11 @@ if st.session_state.view == "form":
     aktif_mi = ayarlar.get("aktif") == "Evet" if ayarlar.get("ok") else False
     form_tipi_erken = ayarlar.get("form_tipi", "Tam") if ayarlar.get("ok") else "Tam"
 
-    ana_baslik = (
-        "Bol-Dav Vicdani Yükümlülük Taahhütnamesi" if form_tipi_erken == "Kisa"
-        else "Bol-Dav Öğrenci Burs Başvuru Formu"
-    )
+    ANA_BASLIKLAR = {
+        "Kisa": "Bol-Dav Vicdani Yükümlülük Taahhütnamesi",
+        "Belge": "Bol-Dav Bursiyer Öğrenci Üst Sınıf ve Mezuniyet Belge Gönderme Sayfası",
+    }
+    ana_baslik = ANA_BASLIKLAR.get(form_tipi_erken, "Bol-Dav Öğrenci Burs Başvuru Formu")
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
     if _ust_serit(ana_baslik, alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
         st.session_state.view = "admin"
@@ -551,6 +560,105 @@ if st.session_state.view == "form":
 
     form_tipi = form_tipi_erken
     kisa_form_mu = form_tipi == "Kisa"
+
+    # ========================================================================
+    # BELGE GÖNDERME FORMU (3. form tipi) — diğerlerinden TAMAMEN BAĞIMSIZ.
+    # Kendi alanları, kendi belgeleri, kendi onayı var; T.C. Kimlik No YOKTUR
+    # (bu formda toplanmıyor). Bu yüzden yönetici panelindeki "İncelendi" ve
+    # "Sil" özellikleri (T.C. Kimlik No ile eşleştirme yapıyor) bu form tipinden
+    # gelen satırlarda ÇALIŞMAZ — sadece görüntüleme/Excel indirme çalışır.
+    # ========================================================================
+    if form_tipi == "Belge":
+        st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
+
+        _bolum_basligi("1", "Öğrenci Bilgileri")
+        bc1, bc2 = st.columns(2)
+        with bc1:
+            belge_ad_soyad = st.text_input("Öğrenci Adı Soyadı *")
+            belge_universite = st.selectbox(
+                "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
+                placeholder="Üniversite adı yazarak arayın...",
+            )
+            belge_universite_diger = ""
+            if belge_universite == "Listede Yok / Diğer":
+                belge_universite_diger = st.text_input("Üniversite adını yazın *")
+        with bc2:
+            belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
+            belge_bolum = st.text_input("Bölümü *")
+        belge_sinif_donem = st.text_input(
+            "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
+        )
+
+        _bolum_basligi("2", "Taranıp Gönderilecek Belgeler")
+        st.caption("Tüm belgeler **PDF** formatında olmalıdır (dosya başına en fazla 10 MB).")
+        belge_uploaded = {}
+        BELGE_SUTUN_SAYISI = 2
+        for i in range(0, len(BELGE_FORM_DOKUMANLARI), BELGE_SUTUN_SAYISI):
+            satir_belgeleri = BELGE_FORM_DOKUMANLARI[i:i + BELGE_SUTUN_SAYISI]
+            kolonlar = st.columns(BELGE_SUTUN_SAYISI)
+            for kolon, doc in zip(kolonlar, satir_belgeleri):
+                with kolon:
+                    belge_uploaded[doc["key"]] = st.file_uploader(
+                        f"{doc['label']} *", type=doc.get("tur", ["pdf"]), key=doc["key"]
+                    )
+
+        _bolum_basligi("3", "Onay")
+        belge_onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelerin doğruluğunu onaylarım. *")
+
+        if st.button("Belgeleri Gönder", use_container_width=True, type="primary"):
+            eksikler = []
+            if not belge_ad_soyad.strip():
+                eksikler.append("Öğrenci Adı Soyadı")
+            if not belge_universite:
+                eksikler.append("Üniversite Adı")
+            elif belge_universite == "Listede Yok / Diğer" and not belge_universite_diger.strip():
+                eksikler.append("Üniversite Adı (listede yoksa elle yazılmalı)")
+            if not belge_bolum.strip():
+                eksikler.append("Bölümü")
+            if not belge_sinif_donem.strip():
+                eksikler.append("Sınıf ve Dönemi")
+            for doc in BELGE_FORM_DOKUMANLARI:
+                if belge_uploaded.get(doc["key"]) is None:
+                    eksikler.append(doc["label"])
+            if not belge_onay:
+                eksikler.append("Onay kutusu işaretlenmeli")
+
+            if eksikler:
+                st.error("Aşağıdaki alanları tamamlayın:\n\n- " + "\n- ".join(eksikler))
+            else:
+                belge_universite_final = (
+                    belge_universite_diger.strip() if belge_universite == "Listede Yok / Diğer" else belge_universite
+                )
+                payload = {
+                    "action": "submit",
+                    "timestamp": datetime.now().isoformat(),
+                    "fields": {
+                        "Form Tipi": "Belge Gönderme",
+                        "Öğrenci Adı Soyadı": belge_ad_soyad,
+                        "Cinsiyet": belge_cinsiyet,
+                        "Üniversite Adı": belge_universite_final,
+                        "Bölüm": belge_bolum,
+                        "Sınıf ve Dönemi": belge_sinif_donem,
+                    },
+                    "files": {
+                        doc["key"]: _file_to_b64(belge_uploaded[doc["key"]])
+                        for doc in BELGE_FORM_DOKUMANLARI
+                    },
+                    "folder_name": f"{belge_ad_soyad.strip()}_belge_gonderme",
+                }
+                st.session_state["pending_payload"] = payload
+                st.session_state["confirm_pending"] = True
+                st.rerun()
+
+        if st.session_state.get("confirm_pending"):
+            _onay_dialogu()
+
+        if st.session_state.get("submit_success"):
+            st.success("Belgeleriniz başarıyla alındı. Teşekkür ederiz.")
+            st.balloons()
+            st.session_state["submit_success"] = False
+
+        st.stop()
 
     st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
 
@@ -963,16 +1071,17 @@ else:
                     "satır silmek için satırın solundaki kutucuğu işaretleyip çöp kutusuna basın. "
                     "**Aynı anda yalnızca bir dönem 'Aktif' olabilir** — o dönem formda görünür, "
                     "başvuruları/dosyaları kendi Drive klasörüne kaydeder ve **kendi Form Tipi ayarına göre** "
-                    "öğrenciye Tam Anket ya da Kısa Form gösterir."
+                    "öğrenciye Tam Anket, Kısa Form ya da Belge Gönderme formunu gösterir."
                 )
+                FORM_TIPI_GORUNEN = {"Tam": "Tam Anket", "Kisa": "Kısa Form", "Belge": "Belge Gönderme"}
+                FORM_TIPI_KOD = {v: k for k, v in FORM_TIPI_GORUNEN.items()}
+
                 donem_df = pd.DataFrame(donem_sonuc.get("donemler", []))
                 if donem_df.empty:
                     donem_df = pd.DataFrame([{"ad": "", "durum": "Pasif", "form_tipi": "Tam"}])
                 if "form_tipi" not in donem_df.columns:
                     donem_df["form_tipi"] = "Tam"
-                donem_df["form_tipi"] = (
-                    donem_df["form_tipi"].map({"Tam": "Tam Anket", "Kisa": "Kısa Form"}).fillna("Tam Anket")
-                )
+                donem_df["form_tipi"] = donem_df["form_tipi"].map(FORM_TIPI_GORUNEN).fillna("Tam Anket")
 
                 edited_donem_df = st.data_editor(
                     donem_df,
@@ -983,7 +1092,7 @@ else:
                         "ad": st.column_config.TextColumn("Dönem Adı", required=True),
                         "durum": st.column_config.SelectboxColumn("Durum", options=["Aktif", "Pasif"], required=True),
                         "form_tipi": st.column_config.SelectboxColumn(
-                            "Form Tipi", options=["Tam Anket", "Kısa Form"], required=True
+                            "Form Tipi", options=list(FORM_TIPI_GORUNEN.values()), required=True
                         ),
                     },
                     key="donem_editor",
@@ -994,7 +1103,7 @@ else:
                         {
                             "ad": str(r["ad"]).strip(),
                             "durum": r["durum"],
-                            "form_tipi": "Kisa" if r["form_tipi"] == "Kısa Form" else "Tam",
+                            "form_tipi": FORM_TIPI_KOD.get(r["form_tipi"], "Tam"),
                         }
                         for _, r in edited_donem_df.iterrows()
                         if str(r["ad"]).strip()
@@ -1257,7 +1366,7 @@ else:
                     else:
                         dl_form_tipleri = []
                     if not dl_form_tipleri:
-                        dl_form_tipleri = ["Tam Anket", "Kısa Form"]
+                        dl_form_tipleri = ["Tam Anket", "Kısa Form", "Belge Gönderme"]
                     indirilecek_form_tipi = st.selectbox("İndirilecek Form Tipi", dl_form_tipleri, key="indir_form_tipi")
 
                 if st.button("📊 Excel Oluştur", use_container_width=True):
