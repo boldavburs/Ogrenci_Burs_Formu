@@ -755,7 +755,6 @@ if st.session_state.view == "form":
         bc1, bc2 = st.columns(2)
         with bc1:
             belge_ad_soyad = st.text_input("Öğrenci Adı Soyadı *")
-            belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
             belge_universite = st.selectbox(
                 "Üniversite Adı *", UNIVERSITE_LISTESI_ARAMA, index=None,
                 placeholder="Üniversite adı yazarak arayın...",
@@ -764,6 +763,7 @@ if st.session_state.view == "form":
             if belge_universite == "Listede Yok / Diğer":
                 belge_universite_diger = st.text_input("Üniversite adını yazın *")
         with bc2:
+            belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
             belge_bolum = st.text_input("Bölümü *")
         belge_sinif_donem = st.text_input(
             "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
