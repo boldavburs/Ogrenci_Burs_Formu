@@ -1,6 +1,7 @@
 import json
 import base64
 import uuid
+import math
 from datetime import date, datetime
 from io import BytesIO
 
@@ -424,47 +425,112 @@ def _logo_base64():
 
 def _basari_animasyonu():
     """Başvuru/gönderim başarılı olduğunda balon yerine logo ile gösterilen animasyon.
-    Ekranın tam ortasında sabit (fixed) bir katman olarak belirir, birkaç saniye
-    sonra otomatik kaybolur. Her çağrıda benzersiz bir kimlik kullanılır ki
-    tarayıcı animasyonu 'içerik değişmedi' diyerek atlamasın."""
+    Ekranın tam ortasında sabit (fixed) bir katman olarak belirir: dönen parıltı
+    halkası + büyük logo + etrafa saçılan konfeti noktaları, birkaç saniye sonra
+    otomatik kaybolur. Her çağrıda benzersiz bir kimlik kullanılır ki tarayıcı
+    animasyonu 'içerik değişmedi' diyerek atlamasın."""
     logo_b64 = _logo_base64()
     if not logo_b64:
         st.balloons()  # logo bulunamazsa yedek olarak Streamlit'in kendi efekti
         return
 
     benzersiz_id = f"basari_{uuid.uuid4().hex[:8]}"
+
+    # Logonun etrafına saçılan konfeti noktalarını üret
+    KONFETI_RENKLERI = ["#F5821F", "#2C2C2A", "#FFFFFF", "#F5821F", "#D6272A"]
+    konfeti_sayisi = 18
+    konfeti_html_parcalari = []
+    konfeti_css_parcalari = []
+    for i in range(konfeti_sayisi):
+        aci = (360 / konfeti_sayisi) * i
+        mesafe = 160 + (i % 3) * 30
+        dx = round(math.cos(math.radians(aci)) * mesafe)
+        dy = round(math.sin(math.radians(aci)) * mesafe)
+        renk = KONFETI_RENKLERI[i % len(KONFETI_RENKLERI)]
+        boyut = 10 if i % 2 == 0 else 7
+        gecikme = 0.15 + (i % 5) * 0.05
+        konfeti_css_parcalari.append(f"""
+        @keyframes {benzersiz_id}_k{i} {{
+            0% {{ transform: translate(0, 0) scale(0) rotate(0deg); opacity: 1; }}
+            70% {{ opacity: 1; }}
+            100% {{ transform: translate({dx}px, {dy}px) scale(1) rotate(220deg); opacity: 0; }}
+        }}
+        #{benzersiz_id}_k{i} {{
+            position: absolute; top: 50%; left: 50%;
+            width: {boyut}px; height: {boyut}px; margin: -{boyut//2}px 0 0 -{boyut//2}px;
+            background: {renk}; border-radius: 3px;
+            animation: {benzersiz_id}_k{i} 1.4s cubic-bezier(0.2, 0.7, 0.4, 1) {gecikme}s both;
+        }}
+        """)
+        konfeti_html_parcalari.append(f'<div id="{benzersiz_id}_k{i}"></div>')
+
+    konfeti_css = "".join(konfeti_css_parcalari)
+    konfeti_html = "".join(konfeti_html_parcalari)
+
     st.markdown(
         f"""
         <style>
         @keyframes {benzersiz_id}_pop {{
-            0%   {{ transform: scale(0) rotate(-20deg); opacity: 0; }}
-            55%  {{ transform: scale(1.15) rotate(5deg); opacity: 1; }}
-            75%  {{ transform: scale(0.95) rotate(-2deg); }}
+            0%   {{ transform: scale(0) rotate(-30deg); opacity: 0; }}
+            50%  {{ transform: scale(1.25) rotate(8deg); opacity: 1; }}
+            70%  {{ transform: scale(0.92) rotate(-4deg); }}
+            85%  {{ transform: scale(1.05) rotate(2deg); }}
             100% {{ transform: scale(1) rotate(0deg); opacity: 1; }}
         }}
         @keyframes {benzersiz_id}_glow {{
-            0%, 100% {{ box-shadow: 0 0 0px 0px rgba(245,130,31,0.5); }}
-            50% {{ box-shadow: 0 0 35px 14px rgba(245,130,31,0.5); }}
+            0%, 100% {{ box-shadow: 0 0 0px 0px rgba(245,130,31,0.55); }}
+            50% {{ box-shadow: 0 0 55px 20px rgba(245,130,31,0.55); }}
+        }}
+        @keyframes {benzersiz_id}_ringspin {{
+            0% {{ transform: rotate(0deg); opacity: 0.9; }}
+            100% {{ transform: rotate(360deg); opacity: 0.9; }}
+        }}
+        @keyframes {benzersiz_id}_shockwave {{
+            0% {{ transform: scale(0.3); opacity: 0.9; border-width: 6px; }}
+            100% {{ transform: scale(2.6); opacity: 0; border-width: 1px; }}
         }}
         @keyframes {benzersiz_id}_fadeout {{
-            0%, 80% {{ opacity: 1; }}
+            0%, 82% {{ opacity: 1; }}
             100% {{ opacity: 0; }}
         }}
         #{benzersiz_id}_kapsayici {{
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: center; align-items: center;
             z-index: 9999; pointer-events: none;
-            animation: {benzersiz_id}_fadeout 3.2s ease-in forwards;
+            animation: {benzersiz_id}_fadeout 4s ease-in forwards;
+        }}
+        #{benzersiz_id}_sahne {{
+            position: relative; width: 320px; height: 320px;
+            display: flex; justify-content: center; align-items: center;
+        }}
+        #{benzersiz_id}_shock {{
+            position: absolute; width: 200px; height: 200px; border-radius: 50%;
+            border: 6px solid #F5821F;
+            animation: {benzersiz_id}_shockwave 1.1s ease-out 0.15s both;
+        }}
+        #{benzersiz_id}_ring {{
+            position: absolute; width: 230px; height: 230px; border-radius: 50%;
+            background: conic-gradient(from 0deg, #F5821F, #FFFFFF, #2C2C2A, #F5821F);
+            animation: {benzersiz_id}_ringspin 3.5s linear infinite;
+            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 6px));
+                    mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 6px));
         }}
         #{benzersiz_id}_kapsayici img {{
-            width: 140px; height: 140px; border-radius: 50%;
-            background: #FFFFFF; padding: 6px; object-fit: cover;
-            animation: {benzersiz_id}_pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
-                       {benzersiz_id}_glow 1.6s ease-in-out 0.7s 2;
+            position: relative; z-index: 2;
+            width: 220px; height: 220px; border-radius: 50%;
+            background: #FFFFFF; padding: 10px; object-fit: cover;
+            animation: {benzersiz_id}_pop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+                       {benzersiz_id}_glow 1.7s ease-in-out 0.8s 2;
         }}
+        {konfeti_css}
         </style>
         <div id="{benzersiz_id}_kapsayici">
-            <img src="data:image/png;base64,{logo_b64}" />
+            <div id="{benzersiz_id}_sahne">
+                <div id="{benzersiz_id}_shock"></div>
+                <div id="{benzersiz_id}_ring"></div>
+                {konfeti_html}
+                <img src="data:image/png;base64,{logo_b64}" />
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -637,14 +703,10 @@ if st.session_state.view == "form":
     donem_adi = secili_donem["ad"] if secili_donem else ""
     form_tipi_erken = secili_donem["form_tipi"] if secili_donem else "Tam"
 
-    ANA_BASLIKLAR = {
-        "Kisa": "Bol-Dav Vicdani Yükümlülük Taahhütnamesi",
-        "Belge": "Bol-Dav Bursiyer Öğrenci Üst Sınıf ve Mezuniyet Belge Gönderme Sayfası",
-    }
     if len(aktif_donemler) > 1 and not secili_donem:
         ana_baslik = "Bol-Dav Öğrenci Burs Başvuru Sistemi"
     else:
-        ana_baslik = ANA_BASLIKLAR.get(form_tipi_erken, "Bol-Dav Öğrenci Burs Başvuru Formu")
+        ana_baslik = f"Bol-Dav {FORM_TIPI_GORUNEN.get(form_tipi_erken, 'Öğrenci Burs Başvuru Formu')}"
     alt_baslik = f"Bol-Dav Bolvadinliler Dayanışma Vakfı — {donem_adi}" if donem_adi else "Bol-Dav Bolvadinliler Dayanışma Vakfı"
     if _ust_serit(ana_baslik, alt_baslik, "Yönetici Girişi", "btn_yonetici_girisi"):
         st.session_state.view = "admin"
