@@ -61,7 +61,7 @@ BELGE_FORM_DOKUMANLARI = [
 # ile kullanıcıya gösterilen isimler arasındaki eşleştirme. İsim değiştirmek
 # isterseniz SADECE bu sözlüğü güncellemeniz yeterli, başka yer değişmez.
 FORM_TIPI_GORUNEN = {
-    "Tam": "Burs Ön Değerlendirme Formu",
+    "Tam": "Burs Ön Değerlendirme Anketi",
     "Kisa": "Burs Başvuru ve Taahhüt Formu",
     "Belge": "Bursiyer Öğrenci Belge Güncelleme Formu",
 }
@@ -1173,19 +1173,29 @@ else:
                         for _, r in edited_donem_df.iterrows()
                         if str(r["ad"]).strip()
                     ]
-                    try:
-                        sonuc = _sync_donemler(temiz_liste)
-                        if sonuc.get("ok"):
-                            _fetch_donemler.clear()
-                            _fetch_settings.clear()
-                            _fetch_aktif_donemler.clear()
-                            st.session_state.donem_basarili = True
-                            st.session_state.exp_donem_acik = True
-                            st.rerun()
-                        else:
-                            st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
-                    except Exception as e:
-                        st.error(f"Güncellenemedi: {e}")
+                    tum_adlar = [d["ad"] for d in temiz_liste]
+                    tekrarlayan_adlar = sorted({ad for ad in tum_adlar if tum_adlar.count(ad) > 1})
+                    if tekrarlayan_adlar:
+                        st.error(
+                            "Aşağıdaki dönem adı/adları birden fazla satırda kullanılmış: "
+                            + ", ".join(f"'{ad}'" for ad in tekrarlayan_adlar)
+                            + ". Her dönem adı **benzersiz** olmalı (aksi halde sistem hangi satırın "
+                            "hangisi olduğunu ayırt edemez). Lütfen isimleri farklılaştırıp tekrar kaydedin."
+                        )
+                    else:
+                        try:
+                            sonuc = _sync_donemler(temiz_liste)
+                            if sonuc.get("ok"):
+                                _fetch_donemler.clear()
+                                _fetch_settings.clear()
+                                _fetch_aktif_donemler.clear()
+                                st.session_state.donem_basarili = True
+                                st.session_state.exp_donem_acik = True
+                                st.rerun()
+                            else:
+                                st.error(f"Güncellenemedi: {sonuc.get('error', 'Bilinmeyen hata')}")
+                        except Exception as e:
+                            st.error(f"Güncellenemedi: {e}")
 
         if "exp_sorular_acik" not in st.session_state:
             st.session_state.exp_sorular_acik = False
