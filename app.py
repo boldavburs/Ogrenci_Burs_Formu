@@ -1,5 +1,6 @@
 import json
 import base64
+import uuid
 from datetime import date, datetime
 from io import BytesIO
 
@@ -422,36 +423,47 @@ def _logo_base64():
 
 
 def _basari_animasyonu():
-    """Başvuru/gönderim başarılı olduğunda balon yerine logo ile gösterilen animasyon."""
+    """Başvuru/gönderim başarılı olduğunda balon yerine logo ile gösterilen animasyon.
+    Ekranın tam ortasında sabit (fixed) bir katman olarak belirir, birkaç saniye
+    sonra otomatik kaybolur. Her çağrıda benzersiz bir kimlik kullanılır ki
+    tarayıcı animasyonu 'içerik değişmedi' diyerek atlamasın."""
     logo_b64 = _logo_base64()
     if not logo_b64:
         st.balloons()  # logo bulunamazsa yedek olarak Streamlit'in kendi efekti
         return
+
+    benzersiz_id = f"basari_{uuid.uuid4().hex[:8]}"
     st.markdown(
         f"""
         <style>
-        @keyframes basari_pop {{
+        @keyframes {benzersiz_id}_pop {{
             0%   {{ transform: scale(0) rotate(-20deg); opacity: 0; }}
-            60%  {{ transform: scale(1.15) rotate(5deg); opacity: 1; }}
-            80%  {{ transform: scale(0.95) rotate(-2deg); }}
-            100% {{ transform: scale(1) rotate(0deg); }}
+            55%  {{ transform: scale(1.15) rotate(5deg); opacity: 1; }}
+            75%  {{ transform: scale(0.95) rotate(-2deg); }}
+            100% {{ transform: scale(1) rotate(0deg); opacity: 1; }}
         }}
-        @keyframes basari_glow {{
+        @keyframes {benzersiz_id}_glow {{
             0%, 100% {{ box-shadow: 0 0 0px 0px rgba(245,130,31,0.5); }}
-            50% {{ box-shadow: 0 0 35px 12px rgba(245,130,31,0.5); }}
+            50% {{ box-shadow: 0 0 35px 14px rgba(245,130,31,0.5); }}
         }}
-        .basari-logo-kutu {{
+        @keyframes {benzersiz_id}_fadeout {{
+            0%, 80% {{ opacity: 1; }}
+            100% {{ opacity: 0; }}
+        }}
+        #{benzersiz_id}_kapsayici {{
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: center; align-items: center;
-            margin: 1.5rem 0;
+            z-index: 9999; pointer-events: none;
+            animation: {benzersiz_id}_fadeout 3.2s ease-in forwards;
         }}
-        .basari-logo-kutu img {{
-            width: 130px; height: 130px; border-radius: 50%;
+        #{benzersiz_id}_kapsayici img {{
+            width: 140px; height: 140px; border-radius: 50%;
             background: #FFFFFF; padding: 6px; object-fit: cover;
-            animation: basari_pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
-                       basari_glow 1.8s ease-in-out 0.7s 2;
+            animation: {benzersiz_id}_pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
+                       {benzersiz_id}_glow 1.6s ease-in-out 0.7s 2;
         }}
         </style>
-        <div class="basari-logo-kutu">
+        <div id="{benzersiz_id}_kapsayici">
             <img src="data:image/png;base64,{logo_b64}" />
         </div>
         """,
