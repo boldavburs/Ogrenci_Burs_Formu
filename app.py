@@ -585,7 +585,7 @@ if st.session_state.view == "form":
 
     ANA_BASLIKLAR = {
         "Kisa": "Bol-Dav Vicdani Yükümlülük Taahhütnamesi",
-        "Belge": "Bol-Dav Bursiyer Öğrenci Akademik Durum Güncellemesi",
+        "Belge": "Bol-Dav Bursiyer Öğrenci Üst Sınıf ve Mezuniyet Belge Gönderme Sayfası",
     }
     if len(aktif_donemler) > 1 and not secili_donem:
         ana_baslik = "Bol-Dav Öğrenci Burs Başvuru Sistemi"
@@ -606,12 +606,12 @@ if st.session_state.view == "form":
     # -------- Birden fazla dönem/form aktifse: seçim ekranı göster --------
     if len(aktif_donemler) > 1 and not secili_donem:
         st.write("Şu anda birden fazla form aktif. Lütfen doldurmak istediğiniz formu seçin:")
-        for d in aktif_donemler:
+        for i, d in enumerate(aktif_donemler):
             gorunen_form_adi = FORM_TIPI_GORUNEN.get(d.get("form_tipi"), "Form")
             if st.button(
                 f"📋 {d.get('ad')} — {gorunen_form_adi}",
                 use_container_width=True,
-                key=f"secim_{d.get('ad')}",
+                key=f"secim_{i}_{d.get('ad')}",
             ):
                 st.session_state.secili_donem_adi = d.get("ad")
                 st.rerun()
