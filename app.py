@@ -585,7 +585,7 @@ if st.session_state.view == "form":
 
     ANA_BASLIKLAR = {
         "Kisa": "Bol-Dav Vicdani Yükümlülük Taahhütnamesi",
-        "Belge": "Bol-Dav Bursiyer Öğrenci Üst Sınıf ve Mezuniyet Belge Gönderme Sayfası",
+        "Belge": "Bol-Dav Bursiyer Öğrenci Akademik Durum Güncellemesi",
     }
     if len(aktif_donemler) > 1 and not secili_donem:
         ana_baslik = "Bol-Dav Öğrenci Burs Başvuru Sistemi"
