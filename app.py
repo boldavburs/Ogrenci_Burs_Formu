@@ -563,21 +563,24 @@ if st.session_state.view == "form":
         aktif_bilgi_alindi = False
         st.error(f"Form ayarları alınamadı, lütfen sayfayı yenileyin. Teknik detay: {e}")
 
-    if "secili_donem_adi" not in st.session_state:
-        st.session_state.secili_donem_adi = None
+    if "secili_donem_key" not in st.session_state:
+        st.session_state.secili_donem_key = None
 
-    # Daha önce seçilen dönem artık aktif değilse (yönetici pasif yaptıysa) seçimi sıfırla
-    if st.session_state.secili_donem_adi and not any(
-        d.get("ad") == st.session_state.secili_donem_adi for d in aktif_donemler
+    # Daha önce seçilen (isim, form tipi) kombinasyonu artık aktif değilse
+    # (yönetici pasif yaptıysa) seçimi sıfırla
+    if st.session_state.secili_donem_key and not any(
+        (d.get("ad"), d.get("form_tipi")) == st.session_state.secili_donem_key for d in aktif_donemler
     ):
-        st.session_state.secili_donem_adi = None
+        st.session_state.secili_donem_key = None
 
     secili_donem = None
     if len(aktif_donemler) == 1:
         secili_donem = aktif_donemler[0]
-    elif len(aktif_donemler) > 1 and st.session_state.secili_donem_adi:
+    elif len(aktif_donemler) > 1 and st.session_state.secili_donem_key:
         secili_donem = next(
-            (d for d in aktif_donemler if d.get("ad") == st.session_state.secili_donem_adi), None
+            (d for d in aktif_donemler
+             if (d.get("ad"), d.get("form_tipi")) == st.session_state.secili_donem_key),
+            None,
         )
 
     donem_adi = secili_donem["ad"] if secili_donem else ""
@@ -613,13 +616,13 @@ if st.session_state.view == "form":
                 use_container_width=True,
                 key=f"secim_{i}_{d.get('ad')}",
             ):
-                st.session_state.secili_donem_adi = d.get("ad")
+                st.session_state.secili_donem_key = (d.get("ad"), d.get("form_tipi"))
                 st.rerun()
         st.stop()
 
     if len(aktif_donemler) > 1 and secili_donem:
         if st.button("🔁 Başka form seç"):
-            st.session_state.secili_donem_adi = None
+            st.session_state.secili_donem_key = None
             st.rerun()
 
     form_tipi = form_tipi_erken
@@ -1173,14 +1176,15 @@ else:
                         for _, r in edited_donem_df.iterrows()
                         if str(r["ad"]).strip()
                     ]
-                    tum_adlar = [d["ad"] for d in temiz_liste]
-                    tekrarlayan_adlar = sorted({ad for ad in tum_adlar if tum_adlar.count(ad) > 1})
-                    if tekrarlayan_adlar:
+                    tum_anahtarlar = [(d["ad"], d["form_tipi"]) for d in temiz_liste]
+                    tekrarlayanlar = sorted({k for k in tum_anahtarlar if tum_anahtarlar.count(k) > 1})
+                    if tekrarlayanlar:
                         st.error(
-                            "Aşağıdaki dönem adı/adları birden fazla satırda kullanılmış: "
-                            + ", ".join(f"'{ad}'" for ad in tekrarlayan_adlar)
-                            + ". Her dönem adı **benzersiz** olmalı (aksi halde sistem hangi satırın "
-                            "hangisi olduğunu ayırt edemez). Lütfen isimleri farklılaştırıp tekrar kaydedin."
+                            "Aşağıdaki dönem + form tipi kombinasyonu birden fazla satırda kullanılmış: "
+                            + ", ".join(f"'{ad}' ({FORM_TIPI_GORUNEN.get(ft, ft)})" for ad, ft in tekrarlayanlar)
+                            + ". Aynı dönem adı farklı form tiplerinde tekrar edebilir (bu normaldir), "
+                            "ama **aynı dönem adı + aynı form tipi** kombinasyonu birden fazla satırda olamaz "
+                            "(sistem hangi satırın hangisi olduğunu ayırt edemez). Lütfen düzeltip tekrar kaydedin."
                         )
                     else:
                         try:
