@@ -61,9 +61,9 @@ BELGE_FORM_DOKUMANLARI = [
 # ile kullanıcıya gösterilen isimler arasındaki eşleştirme. İsim değiştirmek
 # isterseniz SADECE bu sözlüğü güncellemeniz yeterli, başka yer değişmez.
 FORM_TIPI_GORUNEN = {
-    "Tam": "Burs Ön Değerlendirme Anketi",
+    "Tam": "Burs Ön Değerlendirme Formu",
     "Kisa": "Burs Başvuru ve Taahhüt Formu",
-    "Belge": "Bursiyer Öğrenci Belge Güncelleme Formu",
+    "Belge": "Bursiyer Öğrenci Akademik Durum Güncelleme Formu",
 }
 FORM_TIPI_KOD = {v: k for k, v in FORM_TIPI_GORUNEN.items()}
 
