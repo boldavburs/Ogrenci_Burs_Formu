@@ -178,7 +178,7 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
-@st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=45, show_spinner=False)
 def _fetch_aktif_donemler() -> dict:
     """Şu an Aktif olan TÜM dönemleri getirir (birden fazla olabilir)."""
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -421,6 +421,44 @@ def _logo_base64():
         return None
 
 
+def _basari_animasyonu():
+    """Başvuru/gönderim başarılı olduğunda balon yerine logo ile gösterilen animasyon."""
+    logo_b64 = _logo_base64()
+    if not logo_b64:
+        st.balloons()  # logo bulunamazsa yedek olarak Streamlit'in kendi efekti
+        return
+    st.markdown(
+        f"""
+        <style>
+        @keyframes basari_pop {{
+            0%   {{ transform: scale(0) rotate(-20deg); opacity: 0; }}
+            60%  {{ transform: scale(1.15) rotate(5deg); opacity: 1; }}
+            80%  {{ transform: scale(0.95) rotate(-2deg); }}
+            100% {{ transform: scale(1) rotate(0deg); }}
+        }}
+        @keyframes basari_glow {{
+            0%, 100% {{ box-shadow: 0 0 0px 0px rgba(245,130,31,0.5); }}
+            50% {{ box-shadow: 0 0 35px 12px rgba(245,130,31,0.5); }}
+        }}
+        .basari-logo-kutu {{
+            display: flex; justify-content: center; align-items: center;
+            margin: 1.5rem 0;
+        }}
+        .basari-logo-kutu img {{
+            width: 130px; height: 130px; border-radius: 50%;
+            background: #FFFFFF; padding: 6px; object-fit: cover;
+            animation: basari_pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1),
+                       basari_glow 1.8s ease-in-out 0.7s 2;
+        }}
+        </style>
+        <div class="basari-logo-kutu">
+            <img src="data:image/png;base64,{logo_b64}" />
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _ust_serit(baslik: str, alt_baslik: str, buton_metni: str = None, buton_key: str = "ust_serit_btn") -> bool:
     logo_b64 = _logo_base64()
     st.markdown(
@@ -555,7 +593,8 @@ if "admin_authed" not in st.session_state:
 # bayat kalırdı. Bu yüzden gönderim ayrı bir st.button ile tetiklenir.
 if st.session_state.view == "form":
     try:
-        aktif_sonuc = _fetch_aktif_donemler()
+        with st.spinner("Form bilgileri yükleniyor..."):
+            aktif_sonuc = _fetch_aktif_donemler()
         aktif_donemler = aktif_sonuc.get("donemler", []) if aktif_sonuc.get("ok") else []
         aktif_bilgi_alindi = aktif_sonuc.get("ok", False)
     except Exception as e:
@@ -722,7 +761,7 @@ if st.session_state.view == "form":
 
         if st.session_state.get("submit_success"):
             st.success("Belgeleriniz başarıyla alındı. Teşekkür ederiz.")
-            st.balloons()
+            _basari_animasyonu()
             st.session_state["submit_success"] = False
 
         st.stop()
@@ -1094,7 +1133,7 @@ if st.session_state.view == "form":
 
     if st.session_state.get("submit_success"):
         st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
-        st.balloons()
+        _basari_animasyonu()
         st.session_state["submit_success"] = False
 
 
