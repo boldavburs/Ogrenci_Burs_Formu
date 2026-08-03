@@ -1576,11 +1576,14 @@ else:
                         veri_df.to_excel(writer, index=False, sheet_name="Basvurular")
 
                         # -------- Özet Pivot sayfası (statik, hazır özet tablolar) --------
+                        # NOT: "T.C. Kimlik No" sadece Tam Anket/Kısa Form'da var, Belge
+                        # Gönderme'de yok — bu yüzden her form tipinde ortak olan
+                        # "Öğrenci Adı Soyadı" sayım için kullanılır (KeyError'u önler).
                         ozet_sheet_yazildi = False
-                        if "Dönem" in veri_df.columns and "Cinsiyet" in veri_df.columns:
+                        if "Dönem" in veri_df.columns and "Cinsiyet" in veri_df.columns and "Öğrenci Adı Soyadı" in veri_df.columns:
                             pivot1 = pd.pivot_table(
                                 veri_df, index="Dönem", columns="Cinsiyet",
-                                values="T.C. Kimlik No", aggfunc="count", fill_value=0,
+                                values="Öğrenci Adı Soyadı", aggfunc="count", fill_value=0,
                             )
                             pivot1.to_excel(writer, sheet_name="Özet Pivot", startrow=1)
                             ozet_sheet_yazildi = True
