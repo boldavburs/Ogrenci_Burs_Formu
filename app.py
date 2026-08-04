@@ -57,7 +57,7 @@ BELGE_FORM_DOKUMANLARI = [
     {"key": "belge_yeni_kayit", "label": "Sınıf veya Dönem Yeni Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "belge_mezuniyet", "label": "Mezuniyet Belgesi", "tur": ["pdf"]},
     {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar", "tur": ["pdf"]},
-    {"key": "belge_katilim_sertifika", "label": "Katılım Belgesi veya Sertifikası", "tur": ["pdf", "csv", "png"]},
+    {"key": "belge_katilim_sertifika", "label": "Sosyal Sorumluluk Görevi Katılım Belgesi veya Sertifikası", "tur": ["pdf", "csv", "png"]},
 ]
 
 # Form Tipi kodları ("Tam"/"Kisa"/"Belge" — Donemler sayfasında saklanan iç kodlar)
