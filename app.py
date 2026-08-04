@@ -640,7 +640,10 @@ def _onay_dialogu():
                 try:
                     result = _call_apps_script(st.session_state["pending_payload"])
                     if result.get("ok"):
-                        st.session_state["confirm_pending"] = False
+                        # Formu tamamen temizlemek için TÜM oturum durumunu sıfırlıyoruz
+                        # (yazılmış tüm alan değerleri dahil) — kullanıcı gönderimin
+                        # gerçekten kaydedildiğinden emin olsun diye boş bir form görür.
+                        st.session_state.clear()
                         st.session_state["submit_success"] = True
                         st.rerun()
                     else:
