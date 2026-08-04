@@ -773,10 +773,10 @@ if st.session_state.view == "form":
             "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
         )
 
-        st.markdown("**Sosyal Sorumluluk Görevi**")
+        _bolum_basligi("2", "Sosyal Sorumluluk Görevi")
         belge_sorumluluk_yerine_getirildi = st.radio(
             "Burs Başvuru formunda taahhüt ettiğiniz sosyal sorumluluk görevinizi yerine getirdiniz mi? *",
-            ["Evet", "Hayır"], horizontal=True,
+            ["Hayır", "Evet"], horizontal=True,
         )
         _sr_zorunlu = " *" if belge_sorumluluk_yerine_getirildi == "Evet" else ""
         bsc1, bsc2 = st.columns(2)
@@ -789,24 +789,31 @@ if st.session_state.view == "form":
             belge_sorumluluk_gorev = st.text_input(
                 f"Hangi görevi üstlendiniz?{_sr_zorunlu}", key="belge_sorumluluk_gorev_girdi",
             )
+        _katilim_belgesi_tanimi = next(
+            d for d in BELGE_FORM_DOKUMANLARI if d["key"] == "belge_katilim_sertifika"
+        )
+        _katilim_etiket = _katilim_belgesi_tanimi["label"] + _sr_zorunlu
+        belge_uploaded = {
+            "belge_katilim_sertifika": st.file_uploader(
+                _katilim_etiket, type=_katilim_belgesi_tanimi.get("tur", ["pdf"]),
+                key="belge_katilim_sertifika",
+            )
+        }
 
-        _bolum_basligi("2", "Taranıp Gönderilecek Belgeler")
+        _bolum_basligi("3", "Taranıp Gönderilecek Belgeler")
         st.caption("Tüm belgeler **PDF** formatında olmalıdır (dosya başına en fazla 10 MB).")
-        belge_uploaded = {}
+        DIGER_BELGELER = [d for d in BELGE_FORM_DOKUMANLARI if d["key"] != "belge_katilim_sertifika"]
         BELGE_SUTUN_SAYISI = 2
-        for i in range(0, len(BELGE_FORM_DOKUMANLARI), BELGE_SUTUN_SAYISI):
-            satir_belgeleri = BELGE_FORM_DOKUMANLARI[i:i + BELGE_SUTUN_SAYISI]
+        for i in range(0, len(DIGER_BELGELER), BELGE_SUTUN_SAYISI):
+            satir_belgeleri = DIGER_BELGELER[i:i + BELGE_SUTUN_SAYISI]
             kolonlar = st.columns(BELGE_SUTUN_SAYISI)
             for kolon, doc in zip(kolonlar, satir_belgeleri):
                 with kolon:
-                    etiket = doc["label"]
-                    if doc["key"] == "belge_katilim_sertifika" and belge_sorumluluk_yerine_getirildi == "Evet":
-                        etiket = f"{doc['label']} *"
                     belge_uploaded[doc["key"]] = st.file_uploader(
-                        etiket, type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        doc["label"], type=doc.get("tur", ["pdf"]), key=doc["key"]
                     )
 
-        _bolum_basligi("3", "Onay")
+        _bolum_basligi("4", "Onay")
         belge_onay = st.checkbox("Yukarıdaki bilgileri doğrularım ve belgelerin doğruluğunu onaylarım. *")
 
         if st.button("Belgeleri Gönder", use_container_width=True, type="primary"):
