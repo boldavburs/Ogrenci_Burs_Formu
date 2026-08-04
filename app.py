@@ -57,6 +57,7 @@ BELGE_FORM_DOKUMANLARI = [
     {"key": "belge_yeni_kayit", "label": "Sınıf veya Dönem Yeni Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "belge_mezuniyet", "label": "Mezuniyet Belgesi", "tur": ["pdf"]},
     {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar", "tur": ["pdf"]},
+    {"key": "belge_katilim_sertifika", "label": "Katılım Belgesi veya Sertifikası", "tur": ["pdf", "csv", "png"]},
 ]
 
 # Form Tipi kodları ("Tam"/"Kisa"/"Belge" — Donemler sayfasında saklanan iç kodlar)
@@ -772,6 +773,23 @@ if st.session_state.view == "form":
             "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
         )
 
+        st.markdown("**Sosyal Sorumluluk Görevi**")
+        belge_sorumluluk_yerine_getirildi = st.radio(
+            "Burs Başvuru formunda taahhüt ettiğiniz sosyal sorumluluk görevinizi yerine getirdiniz mi? *",
+            ["Evet", "Hayır"], horizontal=True,
+        )
+        _sr_zorunlu = " *" if belge_sorumluluk_yerine_getirildi == "Evet" else ""
+        bsc1, bsc2 = st.columns(2)
+        with bsc1:
+            belge_sorumluluk_kurum = st.text_input(
+                f"Eğer getirdiyseniz hangi kurum/kuruluş/topluluk'da yerine getirdiniz?{_sr_zorunlu}",
+                key="belge_sorumluluk_kurum_girdi",
+            )
+        with bsc2:
+            belge_sorumluluk_gorev = st.text_input(
+                f"Hangi görevi üstlendiniz?{_sr_zorunlu}", key="belge_sorumluluk_gorev_girdi",
+            )
+
         _bolum_basligi("2", "Taranıp Gönderilecek Belgeler")
         st.caption("Tüm belgeler **PDF** formatında olmalıdır (dosya başına en fazla 10 MB).")
         belge_uploaded = {}
@@ -781,8 +799,11 @@ if st.session_state.view == "form":
             kolonlar = st.columns(BELGE_SUTUN_SAYISI)
             for kolon, doc in zip(kolonlar, satir_belgeleri):
                 with kolon:
+                    etiket = doc["label"]
+                    if doc["key"] == "belge_katilim_sertifika" and belge_sorumluluk_yerine_getirildi == "Evet":
+                        etiket = f"{doc['label']} *"
                     belge_uploaded[doc["key"]] = st.file_uploader(
-                        doc["label"], type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        etiket, type=doc.get("tur", ["pdf"]), key=doc["key"]
                     )
 
         _bolum_basligi("3", "Onay")
@@ -800,7 +821,15 @@ if st.session_state.view == "form":
                 eksikler.append("Bölümü")
             if not belge_sinif_donem.strip():
                 eksikler.append("Sınıf ve Dönemi")
-            # Belgeler artık isteğe bağlı — varsa yüklenir, yoksa boş geçilir.
+            # Sosyal sorumluluk görevi "Evet" ise kurum/görev/belge zorunlu hale gelir.
+            if belge_sorumluluk_yerine_getirildi == "Evet":
+                if not belge_sorumluluk_kurum.strip():
+                    eksikler.append("Hangi kurum/kuruluş/topluluk'da yerine getirdiniz")
+                if not belge_sorumluluk_gorev.strip():
+                    eksikler.append("Hangi görevi üstlendiniz")
+                if belge_uploaded.get("belge_katilim_sertifika") is None:
+                    eksikler.append("Katılım Belgesi veya Sertifikası (Evet dediğiniz için zorunlu)")
+            # Diğer belgeler isteğe bağlı — varsa yüklenir, yoksa boş geçilir.
             if not belge_onay:
                 eksikler.append("Onay kutusu işaretlenmeli")
 
@@ -821,6 +850,9 @@ if st.session_state.view == "form":
                         "Üniversite Adı": belge_universite_final,
                         "Bölüm": belge_bolum,
                         "Sınıf ve Dönemi": belge_sinif_donem,
+                        "Sosyal Sorumluluk Görevini Yerine Getirdi mi": belge_sorumluluk_yerine_getirildi,
+                        "Sosyal Sorumluluk - Kurum/Kuruluş/Topluluk": belge_sorumluluk_kurum,
+                        "Sosyal Sorumluluk - Üstlenilen Görev": belge_sorumluluk_gorev,
                     },
                     "files": {
                         doc["key"]: _file_to_b64(belge_uploaded[doc["key"]])
