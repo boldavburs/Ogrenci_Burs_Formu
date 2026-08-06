@@ -679,10 +679,10 @@ if st.session_state.view == "form":
             aktif_sonuc = _fetch_aktif_donemler()
         aktif_donemler = aktif_sonuc.get("donemler", []) if aktif_sonuc.get("ok") else []
         aktif_bilgi_alindi = aktif_sonuc.get("ok", False)
-    except Exception as e:
+    except Exception:
         aktif_donemler = []
         aktif_bilgi_alindi = False
-        st.error(f"Form ayarları alınamadı, lütfen sayfayı yenileyin. Teknik detay: {e}")
+        st.error("📌 Sayfa şu anda yüklenemedi. Lütfen sayfayı yenileyin (F5 veya yenile tuşu).")
 
     if "secili_donem_key" not in st.session_state:
         st.session_state.secili_donem_key = None
@@ -769,9 +769,16 @@ if st.session_state.view == "form":
         with bc2:
             belge_cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
             belge_bolum = st.text_input("Bölümü *")
-        belge_sinif_donem = st.text_input(
-            "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
-        )
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            belge_sinif_donem = st.text_input(
+                "Sınıf ve Dönemi *", placeholder="Örn: 3. Sınıf, 2025-2026 Güz Dönemi"
+            )
+        with gc2:
+            belge_not_ortalamasi = st.number_input(
+                "Genel Not Ortalaması (4 üzerinden) *", min_value=0.0, max_value=4.0,
+                step=0.01, value=None, placeholder="Örn: 3.25",
+            )
 
         _bolum_basligi("2", "Sosyal Sorumluluk Görevi")
         belge_sorumluluk_yerine_getirildi = st.radio(
@@ -821,6 +828,8 @@ if st.session_state.view == "form":
                 eksikler.append("Bölümü")
             if not belge_sinif_donem.strip():
                 eksikler.append("Sınıf ve Dönemi")
+            if belge_not_ortalamasi is None:
+                eksikler.append("Genel Not Ortalaması")
             # Sosyal sorumluluk görevi "Evet" ise kurum/görev/belge zorunlu hale gelir.
             if belge_sorumluluk_yerine_getirildi == "Evet":
                 if not belge_sorumluluk_kurum.strip():
@@ -850,6 +859,7 @@ if st.session_state.view == "form":
                         "Üniversite Adı": belge_universite_final,
                         "Bölüm": belge_bolum,
                         "Sınıf ve Dönemi": belge_sinif_donem,
+                        "Genel Not Ortalaması (4 üzerinden)": belge_not_ortalamasi,
                         "Sosyal Sorumluluk Görevini Yerine Getirdi mi": belge_sorumluluk_yerine_getirildi,
                         "Sosyal Sorumluluk - Kurum/Kuruluş/Topluluk": belge_sorumluluk_kurum,
                         "Sosyal Sorumluluk - Üstlenilen Görev": belge_sorumluluk_gorev,
