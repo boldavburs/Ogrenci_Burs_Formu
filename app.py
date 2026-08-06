@@ -169,6 +169,21 @@ def _fetch_all_rows() -> dict:
     return resp.json()
 
 
+@st.cache_data(ttl=20, show_spinner=False)
+def _fetch_admin_dashboard() -> dict:
+    """Yönetici panelinin ihtiyaç duyduğu başvurular + dönemler + soruları
+    TEK istekte getirir — ayrı ayrı 3 çağrı yerine tek bir Google Apps Script
+    gecikmesi ödenir, panel belirgin şekilde hızlanır."""
+    url = st.secrets["APPS_SCRIPT_URL"]
+    resp = requests.get(
+        url,
+        params={"action": "get_admin_dashboard", "secret": st.secrets["APPS_SCRIPT_SECRET"]},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 @st.cache_data(ttl=30, show_spinner=False)
 def _fetch_settings() -> dict:
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -622,6 +637,7 @@ def _silme_onay_dialogu():
             st.session_state.silinecek_kayitlar = set()
             st.session_state["silme_onay_bekliyor"] = False
             _fetch_all_rows.clear()
+            _fetch_admin_dashboard.clear()
             st.session_state["silme_basarili_sayisi"] = basarili
             st.rerun()
     with col2:
@@ -1279,17 +1295,23 @@ else:
         if st.button("🔄 Verileri Yenile"):
             st.cache_data.clear()
 
+        try:
+            with st.spinner("Panel verileri yükleniyor..."):
+                _dashboard = _fetch_admin_dashboard()
+        except Exception:
+            _dashboard = {"ok": False}
+            st.error("📌 Panel verileri şu anda alınamadı. Lütfen sayfayı yenileyin.")
+
         if "exp_donem_acik" not in st.session_state:
             st.session_state.exp_donem_acik = False
         with st.expander("⚙️ Dönem Yönetimi (Ekle / Düzenle / Sil / Aktif-Pasif)", expanded=st.session_state.exp_donem_acik):
             if st.session_state.get("donem_basarili"):
                 st.success("✅ Dönemler güncellendi.")
                 st.session_state.donem_basarili = False
-            try:
-                donem_sonuc = _fetch_donemler()
-            except Exception as e:
-                donem_sonuc = {"ok": False}
-                st.error(f"Dönemler alınamadı: {e}")
+            donem_sonuc = (
+                {"ok": True, "donemler": _dashboard.get("donemler", [])}
+                if _dashboard.get("ok") else {"ok": False}
+            )
 
             if donem_sonuc.get("ok"):
                 st.caption(
@@ -1351,6 +1373,7 @@ else:
                                 _fetch_donemler.clear()
                                 _fetch_settings.clear()
                                 _fetch_aktif_donemler.clear()
+                                _fetch_admin_dashboard.clear()
                                 st.session_state.donem_basarili = True
                                 st.session_state.exp_donem_acik = True
                                 st.rerun()
@@ -1371,11 +1394,10 @@ else:
             if st.session_state.get("sorular_basarili"):
                 st.success("✅ Sorular güncellendi.")
                 st.session_state.sorular_basarili = False
-            try:
-                sorular_sonuc = _fetch_sorular()
-            except Exception as e:
-                sorular_sonuc = {"ok": False}
-                st.error(f"Sorular alınamadı: {e}")
+            sorular_sonuc = (
+                {"ok": True, "sorular": _dashboard.get("sorular", [])}
+                if _dashboard.get("ok") else {"ok": False}
+            )
 
             if sorular_sonuc.get("ok"):
                 sorular_liste = sorular_sonuc.get("sorular", [])
@@ -1423,6 +1445,7 @@ else:
                         if sonuc.get("ok"):
                             _fetch_sorular.clear()
                             _fetch_sorular_aktif.clear()
+                            _fetch_admin_dashboard.clear()
                             st.session_state.sorular_basarili = True
                             st.session_state.exp_sorular_acik = True
                             st.rerun()
@@ -1431,12 +1454,11 @@ else:
                     except Exception as e:
                         st.error(f"Güncellenemedi: {e}")
 
-        with st.spinner("Veriler alınıyor..."):
-            try:
-                data = _fetch_all_rows()
-            except Exception as e:
-                st.error(f"Veriler alınamadı: {e}")
-                st.stop()
+        if _dashboard.get("ok"):
+            data = {"ok": True, "rows": _dashboard.get("rows", [])}
+        else:
+            st.error("📌 Başvuru verileri şu anda alınamadı. Lütfen sayfayı yenileyin.")
+            st.stop()
 
         rows = data.get("rows", [])
         if not rows:
@@ -1580,6 +1602,7 @@ else:
                     if degisen:
                         st.success(f"{degisen} kayıt güncellendi.")
                         _fetch_all_rows.clear()
+                        _fetch_admin_dashboard.clear()
                         st.rerun()
                     else:
                         st.info("Değişiklik bulunamadı.")
