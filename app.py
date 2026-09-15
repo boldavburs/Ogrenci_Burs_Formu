@@ -769,7 +769,7 @@ if st.session_state.view == "form":
     # gelen satırlarda ÇALIŞMAZ — sadece görüntüleme/Excel indirme çalışır.
     # ========================================================================
     if form_tipi == "Belge":
-        st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
+        st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun. *Tüm alanlar zorunludur.")
 
         _bolum_basligi("1", "Öğrenci Bilgileri")
         bc1, bc2 = st.columns(2)
