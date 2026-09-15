@@ -75,6 +75,17 @@ try:
 except Exception:
     st.set_page_config(page_title="Öğrenci Başvuru Formu", page_icon="📋", layout="wide")
 
+# Önceki çalıştırmada başarılı bir gönderim olduysa, formu HİÇBİR ALAN HENÜZ
+# OLUŞTURULMADAN (script'in en başında) temizliyoruz. Bunu dialog içinde/daha
+# sonra yapmak Streamlit'in "bu çalıştırmada zaten oluşturulmuş widget'ın
+# durumunu değiştirememe" kısıtına takılıyordu — bu yüzden temizleme mutlaka
+# BİR SONRAKİ çalıştırmanın en başında yapılmalı.
+if st.session_state.get("_form_temizlensin"):
+    _yeni_dosya_epoch = uuid.uuid4().hex[:8]
+    st.session_state.clear()
+    st.session_state["submit_success"] = True
+    st.session_state["dosya_epoch"] = _yeni_dosya_epoch
+
 # Sayfa kaynağında ("İncele" / "Sayfa Kaynağını Görüntüle") görünecek imza.
 # Sadece bu metni değiştirerek imzayı güncelleyebilirsiniz.
 st.markdown(
@@ -657,16 +668,12 @@ def _onay_dialogu():
                 try:
                     result = _call_apps_script(st.session_state["pending_payload"])
                     if result.get("ok"):
-                        # Formu tamamen temizlemek için TÜM oturum durumunu sıfırlıyoruz
-                        # (yazılmış tüm alan değerleri dahil) — kullanıcı gönderimin
-                        # gerçekten kaydedildiğinden emin olsun diye boş bir form görür.
-                        st.session_state.clear()
-                        st.session_state["submit_success"] = True
-                        # Dosya yükleme kutuları bazen görsel olarak "yüklü dosya"
-                        # görünümünü koruyabiliyor — her birine benzersiz yeni bir
-                        # kimlik vererek tarayıcının onları tamamen yeni/boş kutular
-                        # olarak ele almasını garanti ediyoruz.
-                        st.session_state["dosya_epoch"] = uuid.uuid4().hex[:8]
+                        # Formu şu an (bu çalıştırma içinde, alanlar zaten çizilmişken)
+                        # temizlemek yerine, bir sonraki sayfa yüklemesinin EN BAŞINDA
+                        # (hiçbir alan henüz oluşturulmamışken) temizlenmesi için bayrak
+                        # bırakıp yeniden çalıştırıyoruz — bu, Streamlit'in "aktif
+                        # widget durumunu aynı çalıştırmada değiştirememe" kısıtını aşar.
+                        st.session_state["_form_temizlensin"] = True
                         st.rerun()
                     else:
                         st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
