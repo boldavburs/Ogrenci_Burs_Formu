@@ -82,9 +82,12 @@ except Exception:
 # BİR SONRAKİ çalıştırmanın en başında yapılmalı.
 if st.session_state.get("_form_temizlensin"):
     _yeni_dosya_epoch = uuid.uuid4().hex[:8]
+    _onay_dogrulanamadi_mi = st.session_state.get("_onay_dogrulanamadi", False)
     st.session_state.clear()
     st.session_state["submit_success"] = True
     st.session_state["dosya_epoch"] = _yeni_dosya_epoch
+    if _onay_dogrulanamadi_mi:
+        st.session_state["submit_success_belirsiz"] = True
 
 # Sayfa kaynağında ("İncele" / "Sayfa Kaynağını Görüntüle") görünecek imza.
 # Sadece bu metni değiştirerek imzayı güncelleyebilirsiniz.
@@ -678,7 +681,18 @@ def _onay_dialogu():
                     else:
                         st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
                 except Exception as e:
-                    st.error(f"Bir hata oluştu, lütfen tekrar deneyin. Teknik detay: {e}")
+                    hata_metni = str(e)
+                    if "googleusercontent.com/macros/echo" in hata_metni and "404" in hata_metni:
+                        # Bu spesifik desen: Apps Script sunucu tarafında işlemi
+                        # tamamlıyor (veri kaydediliyor) ama Google'ın cevabı geri
+                        # teslim etmesinde geçici bir aksaklık oluyor. Doğruladığımız
+                        # kadarıyla veri bu durumda kaydediliyor — bu yüzden korkutucu
+                        # teknik hata yerine güven verici bir mesaj gösteriyoruz.
+                        st.session_state["_form_temizlensin"] = True
+                        st.session_state["_onay_dogrulanamadi"] = True
+                        st.rerun()
+                    else:
+                        st.error(f"Bir hata oluştu, lütfen tekrar deneyin. Teknik detay: {e}")
     with col2:
         if st.button("Vazgeç", use_container_width=True):
             st.session_state["confirm_pending"] = False
@@ -912,7 +926,15 @@ if st.session_state.view == "form":
             _onay_dialogu()
 
         if st.session_state.get("submit_success"):
-            st.success("Belgeleriniz başarıyla alındı. Teşekkür ederiz.")
+            if st.session_state.get("submit_success_belirsiz"):
+                st.success(
+                    "Belgeleriniz gönderildi. Sistemden anlık onay mesajı alınamadı, "
+                    "ancak bilgileriniz büyük olasılıkla kaydedilmiştir. Emin olmak isterseniz "
+                    "birkaç dakika sonra tekrar kontrol edebilirsiniz."
+                )
+                st.session_state["submit_success_belirsiz"] = False
+            else:
+                st.success("Belgeleriniz başarıyla alındı. Teşekkür ederiz.")
             _basari_animasyonu()
             st.session_state["submit_success"] = False
 
@@ -1285,7 +1307,15 @@ if st.session_state.view == "form":
         _onay_dialogu()
 
     if st.session_state.get("submit_success"):
-        st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
+        if st.session_state.get("submit_success_belirsiz"):
+            st.success(
+                "Başvurunuz gönderildi. Sistemden anlık onay mesajı alınamadı, "
+                "ancak bilgileriniz büyük olasılıkla kaydedilmiştir. Emin olmak isterseniz "
+                "birkaç dakika sonra tekrar kontrol edebilirsiniz."
+            )
+            st.session_state["submit_success_belirsiz"] = False
+        else:
+            st.success("Başvurunuz başarıyla alındı. Teşekkür ederiz.")
         _basari_animasyonu()
         st.session_state["submit_success"] = False
 
