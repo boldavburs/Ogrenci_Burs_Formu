@@ -207,7 +207,7 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=1200, show_spinner=False)
 def _fetch_aktif_donemler() -> dict:
     """Şu an Aktif olan TÜM dönemleri getirir (birden fazla olabilir)."""
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -922,7 +922,7 @@ if st.session_state.view == "form":
             _onay_dialogu()
 
         if st.session_state.get("submit_success"):
-            st.success("Belgeleriniz başarıyla alındı. Teşekkür ederiz.")
+            st.success("Başvurunuz başarıyla alındı. Lütfen tekrar gönderim yapmayınız.")
             _basari_animasyonu()
             st.session_state["submit_success"] = False
 
