@@ -196,7 +196,7 @@ def _fetch_settings() -> dict:
     return resp.json()
 
 
-@st.cache_data(ttl=45, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def _fetch_aktif_donemler() -> dict:
     """Şu an Aktif olan TÜM dönemleri getirir (birden fazla olabilir)."""
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -257,7 +257,7 @@ def _fetch_sorular() -> dict:
     return resp.json()
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=180, show_spinner=False)
 def _fetch_sorular_aktif() -> dict:
     """Form için SADECE aktif ek soruları getirir (önbelleğe alınır)."""
     url = st.secrets["APPS_SCRIPT_URL"]
@@ -691,8 +691,12 @@ if "admin_authed" not in st.session_state:
 # bayat kalırdı. Bu yüzden gönderim ayrı bir st.button ile tetiklenir.
 if st.session_state.view == "form":
     try:
-        with st.spinner("Form bilgileri yükleniyor..."):
-            aktif_sonuc = _fetch_aktif_donemler()
+        if "ilk_yukleme_yapildi" not in st.session_state:
+            with st.spinner("Form bilgileri yükleniyor..."):
+                aktif_sonuc = _fetch_aktif_donemler()
+            st.session_state.ilk_yukleme_yapildi = True
+        else:
+            aktif_sonuc = _fetch_aktif_donemler()  # önbellekte hazırsa anında döner, gösterge yok
         aktif_donemler = aktif_sonuc.get("donemler", []) if aktif_sonuc.get("ok") else []
         aktif_bilgi_alindi = aktif_sonuc.get("ok", False)
     except Exception:
@@ -769,7 +773,7 @@ if st.session_state.view == "form":
     # gelen satırlarda ÇALIŞMAZ — sadece görüntüleme/Excel indirme çalışır.
     # ========================================================================
     if form_tipi == "Belge":
-        st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun. *Tüm alanlar zorunludur.")
+        st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
 
         _bolum_basligi("1", "Öğrenci Bilgileri")
         bc1, bc2 = st.columns(2)
@@ -901,7 +905,7 @@ if st.session_state.view == "form":
 
         st.stop()
 
-    st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun. *Tüm alanlar zorunludur.")
+    st.write("Lütfen aşağıdaki bilgileri eksiksiz doldurun ve istenen belgeleri ekleyin. Tüm alanlar zorunludur.")
 
     _bolum_basligi("1", "Öğrenci Bilgileri")
     c1, c2 = st.columns(2)
