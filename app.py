@@ -662,6 +662,11 @@ def _onay_dialogu():
                         # gerçekten kaydedildiğinden emin olsun diye boş bir form görür.
                         st.session_state.clear()
                         st.session_state["submit_success"] = True
+                        # Dosya yükleme kutuları bazen görsel olarak "yüklü dosya"
+                        # görünümünü koruyabiliyor — her birine benzersiz yeni bir
+                        # kimlik vererek tarayıcının onları tamamen yeni/boş kutular
+                        # olarak ele almasını garanti ediyoruz.
+                        st.session_state["dosya_epoch"] = uuid.uuid4().hex[:8]
                         st.rerun()
                     else:
                         st.error(f"Gönderim başarısız: {result.get('error', 'Bilinmeyen hata')}")
@@ -830,7 +835,8 @@ if st.session_state.view == "form":
                     if doc["key"] == "belge_katilim_sertifika":
                         etiket = doc["label"] + _sr_zorunlu
                     belge_uploaded[doc["key"]] = st.file_uploader(
-                        etiket, type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        etiket, type=doc.get("tur", ["pdf"]),
+                        key=f"{doc['key']}_{st.session_state.get('dosya_epoch', '0')}",
                     )
 
         _bolum_basligi("4", "Onay")
@@ -1086,7 +1092,8 @@ if st.session_state.view == "form":
                     zorunlu_mu = doc.get("zorunlu", True)
                     etiket = f"{doc['label']} *" if zorunlu_mu else doc["label"]
                     uploaded[doc["key"]] = st.file_uploader(
-                        etiket, type=doc.get("tur", ["pdf"]), key=doc["key"]
+                        etiket, type=doc.get("tur", ["pdf"]),
+                        key=f"{doc['key']}_{st.session_state.get('dosya_epoch', '0')}",
                     )
 
     if kisa_form_mu:
