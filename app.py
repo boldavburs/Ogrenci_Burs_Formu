@@ -57,7 +57,7 @@ BELGE_FORM_DOKUMANLARI = [
     {"key": "belge_transkript", "label": "Sınıf veya Dönem Transkript", "tur": ["pdf"]},
     {"key": "belge_yeni_kayit", "label": "Sınıf veya Dönem Yeni Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "belge_mezuniyet", "label": "Mezuniyet Belgesi", "tur": ["pdf"]},
-    {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar", "tur": ["pdf"]},
+    {"key": "belge_saglik_raporu", "label": "Sağlık veya Diğer Raporlar (Yalnızca Kayıtlarını Donduran Öğrenciler İçindir)", "tur": ["pdf"]},
     {"key": "belge_katilim_sertifika", "label": "Sosyal Sorumluluk Görevi Katılım Belgesi veya Sertifikası", "tur": ["pdf", "csv", "png"]},
 ]
 
