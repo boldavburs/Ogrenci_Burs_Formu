@@ -20,7 +20,8 @@ import streamlit as st
 REQUIRED_DOCUMENTS = [
     {"key": "vukuatli_nufus_kaydi", "label": "Öğrenci Aile Vukuatlı Nüfus Kayıt Örneği", "tur": ["pdf"]},
     {"key": "anne_baba_gelir_belgesi", "label": "Baba ve Anne Maaş Gelir Belgesi", "tur": ["pdf"]},
-    {"key": "ogrenci_kimlik_belgesi", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi", "tur": ["pdf"]},
+    {"key": "ogrenci_kimlik_on", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Ön Yüz)", "tur": ["pdf"]},
+    {"key": "ogrenci_kimlik_arka", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Arka Yüz)", "tur": ["pdf"]},
     {"key": "ikametgah_belgesi", "label": "Aile İkametgah Belgesi", "tur": ["pdf"]},
     {"key": "adli_sicil_belgesi", "label": "Adli Sicil Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "lise_diploma_belgesi", "label": "Lise Öğrenci Diploma Belgesi ve Notu", "tur": ["pdf"]},
@@ -961,6 +962,16 @@ if st.session_state.view == "form":
             placeholder="Seçiniz", key="nufus_koy",
         )
 
+    # -------- Banka Bilgileri: SADECE "Kısa Form" (Burs Başvuru ve Taahhüt Formu) tipinde gösterilir --------
+    banka_ismi = iban_no = None
+    if kisa_form_mu:
+        st.markdown("**Banka Bilgileri**")
+        ib1, ib2 = st.columns(2)
+        with ib1:
+            banka_ismi = st.text_input("Banka İsmi *")
+        with ib2:
+            iban_no = st.text_input("IBAN No *", placeholder="TR.. .... .... .... .... .... ..")
+
     # -------- Aşağıdaki bölümler SADECE "Tam Anket" form tipinde gösterilir --------
     ikamet_il = ikamet_ilce = kaldigi_yer = None
     universite = universite_diger = bolum = okul_ili = None
@@ -1160,6 +1171,10 @@ if st.session_state.view == "form":
             "Öğrenci Adı Soyadı": ad_soyad, "T.C. Kimlik No": tc_no, "E-Posta Adresi": email,
             "Cep Telefon Numarası": telefon,
         }
+        if kisa_form_mu:
+            zorunlu_metin_alanlari.update({
+                "Banka İsmi": banka_ismi, "IBAN No": iban_no,
+            })
         if not kisa_form_mu:
             zorunlu_metin_alanlari.update({
                 "Fakülte": fakulte, "Bölüm": bolum, "Mezun Olduğu Lise": lise_adi,
@@ -1245,6 +1260,11 @@ if st.session_state.view == "form":
                 "Öğrenci Doğum Yeri İl": dogum_il, "Öğrenci Doğum Yeri İlçe": dogum_ilce,
                 "Nüfusa Kayıtlı Olduğu İl": nufus_il, "Nüfusa Kayıtlı Olduğu İlçe": nufus_ilce,
             }
+            if kisa_form_mu:
+                temel_alanlar.update({
+                    "Banka İsmi": (banka_ismi or "").strip(),
+                    "IBAN No": (iban_no or "").strip().upper().replace(" ", ""),
+                })
             if not kisa_form_mu:
                 temel_alanlar.update({
                     "İkamet İl": ikamet_il, "İkamet İlçe": ikamet_ilce,
