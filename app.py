@@ -322,6 +322,21 @@ def _meslek_secimi(label: str, prefix: str):
     return meslek_diger.strip() if meslek == "Diğer" else meslek
 
 
+def _iban_formatla():
+    """IBAN girdisini her tuş vuruşunda "TR00 0000 0000 0000 0000 0000 00" şeklinde
+    4'erli bloklar hâlinde normalize eder. "TR" önekini korur, ondan sonrasını sadece
+    rakamla sınırlar ve toplamda TR + 24 haneyi (26 karakter) aşmasına izin vermez."""
+    ham = (st.session_state.get("iban_girdi", "") or "").upper()
+    if ham.startswith("TR"):
+        rakam_kismi = "".join(ch for ch in ham[2:] if ch.isdigit())
+    else:
+        rakam_kismi = "".join(ch for ch in ham if ch.isdigit())
+    rakam_kismi = rakam_kismi[:24]
+    tam = "TR" + rakam_kismi
+    gruplar = [tam[i:i + 4] for i in range(0, len(tam), 4)]
+    st.session_state["iban_girdi"] = " ".join(gruplar)
+
+
 @st.cache_data(show_spinner=False)
 def _grafikleri_olustur(df: pd.DataFrame, donem_sayilari_df=None):
     """Tüm Genel Bakış grafiklerini bir kez hesaplayıp önbelleğe alır.
@@ -966,11 +981,17 @@ if st.session_state.view == "form":
     banka_ismi = iban_no = None
     if kisa_form_mu:
         st.markdown("**Banka Bilgileri**")
+        if "iban_girdi" not in st.session_state:
+            st.session_state["iban_girdi"] = "TR"
         ib1, ib2 = st.columns(2)
         with ib1:
             banka_ismi = st.text_input("Banka İsmi *")
         with ib2:
-            iban_no = st.text_input("IBAN No *", placeholder="TR.. .... .... .... .... .... ..")
+            st.text_input(
+                "IBAN No *", key="iban_girdi", on_change=_iban_formatla,
+                max_chars=32, placeholder="TR00 0000 0000 0000 0000 0000 00",
+            )
+            iban_no = st.session_state["iban_girdi"]
 
     # -------- Aşağıdaki bölümler SADECE "Tam Anket" form tipinde gösterilir --------
     ikamet_il = ikamet_ilce = kaldigi_yer = None
@@ -1239,6 +1260,10 @@ if st.session_state.view == "form":
 
         if len(tc_no.strip()) != 11 or not tc_no.strip().isdigit():
             eksikler.append("T.C. Kimlik No (11 haneli olmalı)")
+        if kisa_form_mu:
+            iban_temiz = (iban_no or "").replace(" ", "").upper()
+            if len(iban_temiz) != 26 or not iban_temiz.startswith("TR") or not iban_temiz[2:].isdigit():
+                eksikler.append("IBAN No (TR + 24 haneli olmalı, örn: TR00 0000 0000 0000 0000 0000 00)")
         if kisa_form_mu:
             for doc in REQUIRED_DOCUMENTS:
                 if doc.get("zorunlu", True) and uploaded.get(doc["key"]) is None:
