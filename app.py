@@ -20,8 +20,8 @@ import streamlit as st
 REQUIRED_DOCUMENTS = [
     {"key": "vukuatli_nufus_kaydi", "label": "Tipi: Nüfus Aile Vukuatlı Kayıt Örneği", "tur": ["pdf"]},
     {"key": "anne_baba_gelir_belgesi", "label": "Baba ve Anne Maaş Gelir Belgesi", "tur": ["pdf"]},
-    {"key": "ogrenci_kimlik_on", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Ön Yüz)", "tur": ["pdf"]},
-    {"key": "ogrenci_kimlik_arka", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Arka Yüz)", "tur": ["pdf"]},
+    {"key": "ogrenci_kimlik_on", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Ön Yüz)", "tur": ["pdf","jpg","jpeg","png"]},
+    {"key": "ogrenci_kimlik_arka", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Arka Yüz)", "tur": ["pdf","jpg","jpeg","png"]},
     {"key": "ikametgah_belgesi", "label": "Aile İkametgah Belgesi", "tur": ["pdf"]},
     {"key": "adli_sicil_belgesi", "label": "Adli Sicil Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "lise_diploma_belgesi", "label": "Lise Öğrenci Diploma Belgesi ve Notu", "tur": ["pdf"]},
