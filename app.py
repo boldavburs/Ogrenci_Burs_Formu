@@ -28,7 +28,7 @@ REQUIRED_DOCUMENTS = [
     {"key": "yks_yerlesme_belgesi", "label": "YKS Yerleşme Belgesi", "tur": ["pdf"]},
     {"key": "universite_kayit_belgesi", "label": "Üniversite Kayıt Aktif Öğrenci Belgesi", "tur": ["pdf"]},
     {"key": "transkript", "label": "Transkript (ara sınıflar için)", "tur": ["pdf"], "zorunlu": False},
-    {"key": "banka_iban", "label": "Öğrenci Banka ve İban Numarası", "tur": ["pdf"]},
+    {"key": "banka_iban", "label": "Öğrenci Banka ve İban Numarası", "tur": ["pdf","jpg","jpeg","png"]},
     {"key": "vesikalik_fotograf", "label": "1 Adet Vesikalık Fotoğraf", "tur": ["jpg", "jpeg", "png"]},
 ]
 
