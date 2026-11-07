@@ -18,7 +18,7 @@ import streamlit as st
 # sadece PDF kabul eder. Sadece bu listeyi değiştirerek belge setini
 # güncelleyebilirsiniz, başka yer değişmez.
 REQUIRED_DOCUMENTS = [
-    {"key": "vukuatli_nufus_kaydi", "label": "Öğrenci Aile Vukuatlı Nüfus Kayıt Örneği", "tur": ["pdf"]},
+    {"key": "vukuatli_nufus_kaydi", "label": "Tipi: Nüfus Aile Vukuatlı Kayıt Örneği", "tur": ["pdf"]},
     {"key": "anne_baba_gelir_belgesi", "label": "Baba ve Anne Maaş Gelir Belgesi", "tur": ["pdf"]},
     {"key": "ogrenci_kimlik_on", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Ön Yüz)", "tur": ["pdf"]},
     {"key": "ogrenci_kimlik_arka", "label": "Öğrenci Nüfus Cüzdanı Kimlik Belgesi (Arka Yüz)", "tur": ["pdf"]},
