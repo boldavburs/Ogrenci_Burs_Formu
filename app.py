@@ -953,7 +953,7 @@ if st.session_state.view == "form":
         tc_no = st.text_input("T.C. Kimlik No *", max_chars=11)
     with c2:
         cinsiyet = st.radio("Cinsiyet *", ["Erkek", "Kadın"], horizontal=True)
-        email = st.text_input("E-Posta Adresi *")
+        email = st.text_input("E-Posta Adresi (yazlızca gmail e-posta adreslerinizi girmelisiniz!) *")
     telefon = st.text_input("Cep Telefon Numarası *", placeholder="05xx xxx xx xx")
     dogum_tarihi = _turkce_tarih_secimi(
         "Öğrenci Doğum Tarihi *", "ogrenci_dogum_tarihi",
