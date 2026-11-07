@@ -26,7 +26,7 @@ REQUIRED_DOCUMENTS = [
     {"key": "adli_sicil_belgesi", "label": "Adli Sicil Kayıt Belgesi", "tur": ["pdf"]},
     {"key": "lise_diploma_belgesi", "label": "Lise Öğrenci Diploma Belgesi ve Notu", "tur": ["pdf"]},
     {"key": "yks_yerlesme_belgesi", "label": "YKS Yerleşme Belgesi", "tur": ["pdf"]},
-    {"key": "universite_kayit_belgesi", "label": "Üniversite Kayıt Öğrenci Belgesi", "tur": ["pdf"]},
+    {"key": "universite_kayit_belgesi", "label": "Üniversite Kayıt Aktif Öğrenci Belgesi", "tur": ["pdf"]},
     {"key": "transkript", "label": "Transkript (ara sınıflar için)", "tur": ["pdf"], "zorunlu": False},
     {"key": "banka_iban", "label": "Öğrenci Banka ve İban Numarası", "tur": ["pdf"]},
     {"key": "vesikalik_fotograf", "label": "1 Adet Vesikalık Fotoğraf", "tur": ["jpg", "jpeg", "png"]},
