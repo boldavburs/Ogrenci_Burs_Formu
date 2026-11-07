@@ -980,7 +980,7 @@ if st.session_state.view == "form":
     # -------- Banka Bilgileri: SADECE "Kısa Form" (Burs Başvuru ve Taahhüt Formu) tipinde gösterilir --------
     banka_ismi = iban_no = None
     if kisa_form_mu:
-        st.markdown("**Banka Bilgileri**")
+        st.markdown("**Öğrenciye Ait Banka Bilgileri**")
         if "iban_girdi" not in st.session_state:
             st.session_state["iban_girdi"] = "TR"
         ib1, ib2 = st.columns(2)
