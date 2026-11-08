@@ -1129,8 +1129,7 @@ if st.session_state.view == "form":
     if kisa_form_mu:
         _bolum_basligi("2", "Belgeler")
         st.caption(
-            "Vesikalık fotoğraf hariç tüm belgeler **PDF** formatında olmalıdır "
-            "(dosya başına en fazla 10 MB). Vesikalık fotoğraf için JPG/PNG kabul edilir."
+            "Belgeleri istenilen formatlarda gönderiniz"
         )
         SUTUN_SAYISI = 3
         for i in range(0, len(REQUIRED_DOCUMENTS), SUTUN_SAYISI):
