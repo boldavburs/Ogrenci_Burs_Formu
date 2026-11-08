@@ -1288,6 +1288,7 @@ if st.session_state.view == "form":
                 temel_alanlar.update({
                     "Banka İsmi": (banka_ismi or "").strip(),
                     "IBAN No": (iban_no or "").strip().upper().replace(" ", ""),
+                    "Taahhüt onay durumu": "Evet",
                 })
             if not kisa_form_mu:
                 temel_alanlar.update({
@@ -1537,6 +1538,15 @@ else:
             st.info("Henüz başvuru yok.")
         else:
             df_tum = pd.DataFrame(rows)
+            # Kısa Form, taahhüt ifadesi yazılmadan gönderilemediği için bu form tipindeki
+            # (sütunun eklenmesinden önceki) eski satırlar da "Evet" sayılır.
+            if "Form Tipi" in df_tum.columns:
+                if "Taahhüt onay durumu" not in df_tum.columns:
+                    df_tum["Taahhüt onay durumu"] = ""
+                kisa_maske = (df_tum["Form Tipi"] == FORM_TIPI_GORUNEN["Kisa"]) & (
+                    df_tum["Taahhüt onay durumu"].astype(str).str.strip() == ""
+                )
+                df_tum.loc[kisa_maske, "Taahhüt onay durumu"] = "Evet"
             for col in ["Babanın Aylık Geliri (TL)", "Annenin Aylık Geliri (TL)", "Okumakta Olan Kardeş Sayısı"]:
                 if col in df_tum.columns:
                     df_tum[col] = pd.to_numeric(df_tum[col], errors="coerce")
